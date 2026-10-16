@@ -1,0 +1,6 @@
+{
+  "name": "MandirVeda — Sacred Hindu Rituals, Puja Booking & Samagri Store",
+  "description": "Book authentic Hindu Vedic pujas with verified priests, reserve ritual dates and times, shop sacred samagri essentials, and manage ceremonies with live tracking and PDF receipts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

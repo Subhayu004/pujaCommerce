@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <!-- Radiant gold-saffron gradient -->
+    <linearGradient id="saffronGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFB300" />
+      <stop offset="35%" stop-color="#F57C00" />
+      <stop offset="70%" stop-color="#E65100" />
+      <stop offset="100%" stop-color="#D84315" />
+    </linearGradient>
+
+    <linearGradient id="warmAmber" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E65100" />
+      <stop offset="50%" stop-color="#FB8C00" />
+      <stop offset="100%" stop-color="#FFD54F" />
+    </linearGradient>
+
+    <radialGradient id="creamBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFDF7" />
+      <stop offset="75%" stop-color="#FFF5E4" />
+      <stop offset="100%" stop-color="#FDE8C8" />
+    </radialGradient>
+
+    <!-- Top Text Curved Path -->
+    <path id="topArc" d="M 95,245 A 165,165 0 0,1 405,245" fill="none" />
+    <!-- Bottom Text Curved Path -->
+    <path id="bottomArc" d="M 410,250 A 175,175 0 0,1 90,250" fill="none" />
+  </defs>
+
+  <!-- Outer Saffron Circular Border Ring -->
+  <circle cx="250" cy="250" r="242" fill="#EA6A00" />
+
+  <!-- Inner Cream Background Base -->
+  <circle cx="250" cy="250" r="236" fill="url(#creamBg)" />
+
+  <!-- Decorative Scalloped Lotus Petal Ring (16 Petals) -->
+  <path
+    d="M 250,22
+       C 272,32 295,30 312,45
+       C 328,60 348,68 368,88
+       C 388,108 396,128 411,144
+       C 426,161 424,184 434,206
+       C 444,228 454,238 454,250
+       C 454,262 444,272 434,294
+       C 424,316 426,339 411,356
+       C 396,372 388,392 368,412
+       C 348,432 328,440 312,455
+       C 295,470 272,468 250,478
+       C 228,468 205,470 188,455
+       C 172,440 152,432 132,412
+       C 112,392 104,372 89,356
+       C 74,339 76,316 66,294
+       C 56,272 46,262 46,250
+       C 46,238 56,228 66,206
+       C 76,184 74,161 89,144
+       C 104,128 112,108 132,88
+       C 152,68 172,60 188,45
+       C 205,30 228,32 250,22 Z"
+    fill="none"
+    stroke="#EA6A00"
+    stroke-width="3.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Top Curved Brand Text: PUJA SATHI -->
+  <text font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="800" font-size="29" fill="#D85C00" letter-spacing="4">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">
+      PUJA SATHI
+    </textPath>
+  </text>
+
+  <!-- Bottom Curved Tagline: SOLUTION FOR YOUR PUJA -->
+  <text font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="700" font-size="20" fill="#D85C00" letter-spacing="4.5">
+    <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">
+      SOLUTION FOR YOUR PUJA
+    </textPath>
+  </text>
+
+  <!-- CENTER LOGO ARTWORK: LORD GANESHA WITH OM SYMBOL -->
+  <g transform="translate(140, 115) scale(0.92)" stroke="url(#saffronGold)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Mukut / Crown Diadem with flame crests -->
+    <path d="M 112,50 Q 115,22 120,8 Q 125,22 128,50" fill="url(#saffronGold)" />
+    <path d="M 100,52 Q 106,30 112,18" fill="none" stroke-width="4.5" />
+    <path d="M 140,52 Q 134,30 128,18" fill="none" stroke-width="4.5" />
+    <ellipse cx="120" cy="54" rx="20" ry="5.5" fill="none" stroke-width="5" />
+    <ellipse cx="120" cy="65" rx="15" ry="4.5" fill="none" stroke-width="4" />
+    <ellipse cx="120" cy="74" rx="9" ry="3.5" fill="none" stroke-width="3.5" />
+
+    <!-- Forehead & Left Ear Arc (Sweeping Ganesha ear) -->
+    <path
+      d="M 100,68
+         C 75,65 52,82 50,115
+         C 48,145 68,165 82,168
+         C 88,169 92,162 88,155
+         C 76,145 66,132 68,115
+         C 70,95 86,84 104,82"
+      fill="url(#saffronGold)"
+      stroke-width="2"
+    />
+
+    <!-- Forehead Tilak & Brow line -->
+    <path
+      d="M 116,84
+         C 122,86 130,94 134,106
+         C 137,118 132,126 126,128"
+      fill="none"
+      stroke-width="5"
+    />
+
+    <!-- Divine Eye & Lash Line -->
+    <path
+      d="M 118,102
+         Q 125,108 126,116
+         Q 121,114 116,108"
+      fill="#EA6A00"
+    />
+    <circle cx="122" cy="110" r="2.2" fill="#FFFDF7" />
+
+    <!-- Tusk / Dant -->
+    <path
+      d="M 104,152
+         C 107,156 112,160 116,162
+         C 112,164 105,162 101,157 Z"
+      fill="url(#saffronGold)"
+      stroke-width="1.5"
+    />
+
+    <!-- Flowing Trunk (Graceful S-curve curling inward with Modak essence) -->
+    <path
+      d="M 126,128
+         C 124,155 106,172 104,200
+         C 101,232 120,250 144,248
+         C 168,246 174,224 165,208
+         C 155,190 134,196 132,214
+         C 130,226 142,230 148,225
+         C 152,220 150,214 144,213
+         C 138,212 138,218 141,220"
+      fill="none"
+      stroke-width="7"
+      stroke-linecap="round"
+    />
+
+    <!-- Shading & Highlight Ribbon along Trunk -->
+    <path
+      d="M 120,135
+         C 118,160 102,176 100,202
+         C 98,230 114,244 136,244"
+      fill="none"
+      stroke="#FFD54F"
+      stroke-width="3"
+      stroke-linecap="round"
+    />
+
+    <!-- Large Belly / Body Loop (Ganesha Udara) forming the base of OM -->
+    <path
+      d="M 75,178
+         C 45,190 32,220 42,250
+         C 52,282 85,296 125,292
+         C 165,288 185,268 190,245
+         C 192,238 184,235 180,240
+         C 170,255 152,274 122,276
+         C 90,278 64,264 56,242
+         C 48,220 58,198 80,186
+         C 88,182 85,174 75,178 Z"
+      fill="url(#saffronGold)"
+      stroke-width="1.5"
+    />
+
+    <!-- SACRED OM FLANK (Right Calligraphic Structure) -->
+    <!-- Upper right Om loop & curve -->
+    <path
+      d="M 148,130
+         C 172,130 198,145 196,176
+         C 194,204 170,222 148,224
+         C 168,228 192,242 190,268
+         C 188,296 158,312 125,312
+         C 114,312 110,302 120,300
+         C 146,296 172,282 174,262
+         C 176,242 154,232 136,232
+         C 130,232 130,224 136,224
+         C 156,224 178,212 180,186
+         C 182,160 162,146 142,146
+         C 134,146 136,130 148,130 Z"
+      fill="url(#saffronGold)"
+      stroke-width="1.5"
+    />
+
+    <!-- Om Chandra-Bindu / Crescent and Divine Dot -->
+    <path
+      d="M 180,132
+         C 192,135 204,144 212,156
+         C 204,152 194,146 182,145
+         C 178,144 176,131 180,132 Z"
+      fill="url(#saffronGold)"
+    />
+    <circle cx="206" cy="136" r="5" fill="url(#saffronGold)" />
+  </g>
+</svg>
