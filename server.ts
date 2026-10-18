@@ -56,9 +56,9 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MandirVeda Server running on http://0.0.0.0:${PORT}`);
+    console.log(`PujaSathi Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
