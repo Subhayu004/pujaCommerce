@@ -9,7 +9,7 @@ interface CheckoutPageProps {
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
   const { cart, refreshCart, isLoading } = useCart();
-  const { user } = useAuth();
+  const { user, openAuthModal } = useAuth();
 
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -180,6 +180,36 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
       <div className="max-w-2xl mx-auto px-4 py-24 text-center space-y-4">
         <Loader2 className="w-8 h-8 animate-spin text-[#9A3412] mx-auto" />
         <p className="text-sm text-[#78716C]">Loading your sacred seva items...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 mx-auto rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold font-heading text-[#292524]">Sign In Required</h2>
+          <p className="text-xs text-[#57534E] mt-2 leading-relaxed">
+            Please sign in to your devotee account or create an account to confirm your sacred puja booking and proceed with checkout.
+          </p>
+        </div>
+        <div className="space-y-2.5">
+          <button
+            onClick={() => openAuthModal('Please sign in or create an account to proceed with checkout.')}
+            className="w-full py-3.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold shadow-md cursor-pointer transition-colors"
+          >
+            Sign In / Create Account
+          </button>
+          <button
+            onClick={() => onNavigate('/cart')}
+            className="w-full py-2.5 rounded-xl bg-white border border-[#D1BA9C] hover:bg-[#F5EFEB] text-xs font-medium text-[#57534E] cursor-pointer transition-colors"
+          >
+            Return to Cart
+          </button>
+        </div>
       </div>
     );
   }

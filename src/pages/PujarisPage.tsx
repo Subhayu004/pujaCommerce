@@ -21,14 +21,20 @@ export const PujarisPage: React.FC<PujarisPageProps> = ({
 
   const filteredPujaris = useMemo(() => {
     return pujaris.filter((p) => {
+      const name = p.name || '';
+      const bio = p.bio || '';
+      const specializations = p.specializations || '';
+      const service_areas = p.service_areas || '';
+      const languages = p.languages || '';
+
       const matchesSearch =
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.bio.toLowerCase().includes(search.toLowerCase()) ||
-        p.specializations.toLowerCase().includes(search.toLowerCase()) ||
-        p.service_areas.toLowerCase().includes(search.toLowerCase());
+        name.toLowerCase().includes(search.toLowerCase()) ||
+        bio.toLowerCase().includes(search.toLowerCase()) ||
+        specializations.toLowerCase().includes(search.toLowerCase()) ||
+        service_areas.toLowerCase().includes(search.toLowerCase());
 
       const matchesLang =
-        selectedLanguage === 'all' || p.languages.includes(selectedLanguage);
+        selectedLanguage === 'all' || languages.includes(selectedLanguage);
 
       return matchesSearch && matchesLang;
     });

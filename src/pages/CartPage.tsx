@@ -1,6 +1,7 @@
 import React from 'react';
-import { Trash2, Calendar, Clock, MapPin, User, ArrowRight, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { Trash2, Calendar, Clock, MapPin, User, ArrowRight, ShoppingBag, ShieldCheck, Lock } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { ProductArt, RudrabhishekArt, GrihaPraveshArt, SatyanarayanArt, LakshmiKuberArt } from '../components/SpiritualArt';
 
 interface CartPageProps {
@@ -9,6 +10,7 @@ interface CartPageProps {
 
 export const CartPage: React.FC<CartPageProps> = ({ onNavigate }) => {
   const { cart, updateQuantity, removeItem, isLoading } = useCart();
+  const { user, openAuthModal } = useAuth();
 
   const formatPrice = (paise: number) => {
     return '₹' + (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -268,11 +270,33 @@ export const CartPage: React.FC<CartPageProps> = ({ onNavigate }) => {
               </span>
             </div>
 
+            {!user && (
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>Sign in required to confirm your booking</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('Please sign in or create an account to proceed to checkout.')}
+                  className="underline font-semibold text-[#9A3412] shrink-0 hover:text-[#7C2D12] cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+
             <button
-              onClick={() => onNavigate('/checkout')}
+              onClick={() => {
+                if (!user) {
+                  openAuthModal('Please sign in or create an account to proceed to checkout.', () => onNavigate('/checkout'));
+                  return;
+                }
+                onNavigate('/checkout');
+              }}
               className="w-full py-3.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Proceed to Checkout</span>
+              <span>{user ? 'Proceed to Checkout' : 'Sign In to Proceed to Checkout'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 

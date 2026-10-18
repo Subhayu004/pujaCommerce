@@ -3,6 +3,7 @@ import { ShoppingBag, Check } from 'lucide-react';
 import { Product } from '../types';
 import { ProductArt } from './SpiritualArt';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 interface ProductCardProps {
   product: Product;
@@ -11,6 +12,7 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => {
   const { addProductToCart } = useCart();
+  const { user, openAuthModal } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -19,6 +21,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails
   };
 
   const handleAddToCart = async () => {
+    if (!user) {
+      openAuthModal('Please sign in or create an account to add sacred puja essentials to your cart.', () => {
+        addProductToCart(product.id, 1);
+      });
+      return;
+    }
     setIsAdding(true);
     const res = await addProductToCart(product.id, 1);
     setIsAdding(false);

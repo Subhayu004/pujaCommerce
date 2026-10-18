@@ -184,7 +184,33 @@ export function initDatabase() {
 }
 
 function seedInitialData() {
-  // Check if admin exists
+  // Check if official admin exists
+  const officialAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get('pujasathisupport@gmail.com');
+  const adminPasswordHash = bcrypt.hashSync('PujaSathiAdmin@2025', 10);
+  if (!officialAdmin) {
+    db.prepare(`
+      INSERT INTO users (id, email, password_hash, full_name, role, phone, address_line, city, state, pincode)
+      VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?)
+    `).run(
+      'usr_pujasathi_admin',
+      'pujasathisupport@gmail.com',
+      adminPasswordHash,
+      'PujaSathi Administrator',
+      '+91 84500 02545',
+      'PujaSathi Administrative Block, Temple Road',
+      'Varanasi',
+      'Uttar Pradesh',
+      '221001'
+    );
+  } else {
+    db.prepare('UPDATE users SET password_hash = ?, role = ? WHERE email = ?').run(
+      adminPasswordHash,
+      'admin',
+      'pujasathisupport@gmail.com'
+    );
+  }
+
+  // Check if legacy admin exists
   const existingAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@mandirveda.com');
   if (!existingAdmin) {
     const adminPasswordHash = bcrypt.hashSync('Admin@123456', 10);

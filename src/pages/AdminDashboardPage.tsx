@@ -54,16 +54,31 @@ interface AdminDashboardPageProps {
 }
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNavigate, onCatalogUpdated }) => {
-  const { user, login, getAuthHeaders } = useAuth();
+  const { user, isLoading, login, getAuthHeaders } = useAuth();
 
   // Admin login state if unauthenticated or non-admin
-  const [adminEmail, setAdminEmail] = useState('admin@mandirveda.com');
-  const [adminPassword, setAdminPassword] = useState('Admin@123456');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security'>('bookings');
+  // Tabs - restore from localStorage if user was previously viewing a tab
+  const [activeTab, setActiveTabState] = useState<'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security'>(() => {
+    try {
+      const saved = localStorage.getItem('pujasathi_admin_active_tab') as any;
+      if (['overview', 'bookings', 'pujas', 'products', 'pujaris', 'security'].includes(saved)) {
+        return saved;
+      }
+    } catch {}
+    return 'bookings';
+  });
+
+  const setActiveTab = (tab: 'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security') => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('pujasathi_admin_active_tab', tab);
+    } catch {}
+  };
 
   // Database Data States
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
@@ -480,7 +495,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       required_materials: 'Complete consecrated Vedic samagri kit, Gangajal, pure cow ghee, bilva leaves.',
       booking_requirements: 'Clean altar space and traditional attire.',
       is_active: 1,
-      featured: 0,
+      featured: 1,
     });
     setPujaModalOpen(true);
   };
@@ -590,6 +605,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       loadAdminData();
       onCatalogUpdated?.();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
     } catch (err: any) {
       setIsSavingPuja(false);
       setActionError(err.message || 'Error saving puja');
@@ -607,6 +623,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         setPujasList((prev) => prev.filter((p) => p.id !== puja.id));
         loadAdminData();
         onCatalogUpdated?.();
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
       } else {
         setActionError(res.data?.error || 'Failed to delete puja');
         setTimeout(() => setActionError(''), 4000);
@@ -634,7 +651,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       stock: 50,
       image: 'thali',
       is_active: 1,
-      featured: 0,
+      featured: 1,
     });
     setProductModalOpen(true);
   };
@@ -731,6 +748,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       loadAdminData();
       onCatalogUpdated?.();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
     } catch (err: any) {
       setIsSavingProduct(false);
       setActionError(err.message || 'Error saving product');
@@ -748,6 +766,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         setProductsList((prev) => prev.filter((p) => p.id !== prod.id));
         loadAdminData();
         onCatalogUpdated?.();
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
       } else {
         setActionError(res.data?.error || 'Failed to remove product');
         setTimeout(() => setActionError(''), 4000);
@@ -888,6 +907,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       loadAdminData();
       onCatalogUpdated?.();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
     } catch (err: any) {
       setIsSavingPujari(false);
       setActionError(err.message || 'Error saving acharya');
@@ -921,6 +941,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         setPujarisList((prev) => prev.filter((p) => p.id !== pujari.id));
         loadAdminData();
         onCatalogUpdated?.();
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
       } else {
         setActionError(res.data?.error || 'Failed to remove acharya');
         setTimeout(() => setActionError(''), 4000);
@@ -971,6 +992,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     }
   };
 
+  // If verifying session on reload, show smooth loading spinner
+  if (isLoading) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-32 text-center flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-3 border-[#9A3412] border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-medium text-[#78716C]">Verifying Temple Administrative Session...</p>
+      </div>
+    );
+  }
+
   // If not logged in as Admin, show strictly protected login screen
   if (!user || user.role !== 'admin') {
     return (
@@ -1005,6 +1036,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 required
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="pujasathisupport@gmail.com"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[#D1BA9C] bg-white text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#9A3412]/30"
               />
             </div>
@@ -1018,6 +1050,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 required
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="••••••••••••"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[#D1BA9C] bg-white text-sm text-[#292524] focus:outline-none focus:ring-2 focus:ring-[#9A3412]/30"
               />
             </div>
@@ -1025,35 +1058,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             <button
               type="submit"
               disabled={isLoggingIn}
-              className="w-full py-3 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
             >
               {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
               <span>Sign In to Admin Portal</span>
             </button>
-
-            <button
-              type="button"
-              onClick={async () => {
-                setAdminEmail('admin@mandirveda.com');
-                setAdminPassword('Admin@123456');
-                setIsLoggingIn(true);
-                const res = await login('admin@mandirveda.com', 'Admin@123456');
-                setIsLoggingIn(false);
-                if (!res.success) {
-                  setAuthError(res.error || 'Invalid credentials or account locked.');
-                }
-              }}
-              disabled={isLoggingIn}
-              className="w-full py-2.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-2xs"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>⚡ Instant 1-Click Admin Access</span>
-            </button>
           </form>
-
-          <div className="mt-4 pt-4 border-t border-[#E7DCCE] text-[11px] text-[#78716C] text-center">
-            Default credentials: <strong className="text-[#292524]">admin@mandirveda.com</strong> / <strong className="text-[#292524]">Admin@123456</strong>
-          </div>
         </div>
       </div>
     );

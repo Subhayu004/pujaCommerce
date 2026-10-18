@@ -21,9 +21,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   onBookPuja,
   onNavigate,
 }) => {
-  const featuredPujas = pujas.slice(0, 3);
-  const featuredProducts = products.slice(0, 4);
-  const featuredPujaris = pujaris.slice(0, 3);
+  const featuredPujas = pujas.slice(0, 6);
+  const featuredProducts = products.slice(0, 8);
+  const featuredPujaris = pujaris.slice(0, 4);
 
   return (
     <div className="space-y-16 sm:space-y-24 pb-16">

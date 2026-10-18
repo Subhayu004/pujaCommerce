@@ -6,10 +6,19 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultMode?: 'login' | 'register';
+  promptMessage?: string;
+  onSuccess?: () => void;
   onNavigate?: (path: string) => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMode = 'login', onNavigate }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  defaultMode = 'login',
+  promptMessage,
+  onSuccess,
+  onNavigate,
+}) => {
   const { login, register } = useAuth();
   const [isLogin, setIsLogin] = useState<boolean>(defaultMode === 'login');
   const [email, setEmail] = useState('');
@@ -31,7 +40,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
       setLoading(false);
       if (res.success) {
         onClose();
-        if (email.toLowerCase().includes('admin') && onNavigate) {
+        if (onSuccess) onSuccess();
+        if (
+          (email.toLowerCase() === 'pujasathisupport@gmail.com' ||
+            email.toLowerCase().includes('admin')) &&
+          onNavigate
+        ) {
           onNavigate('/admin');
         }
       } else {
@@ -47,20 +61,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
       setLoading(false);
       if (res.success) {
         onClose();
+        if (onSuccess) onSuccess();
       } else {
         setError(res.error || 'Failed to create account');
       }
-    }
-  };
-
-  const fillQuickDemo = (demoType: 'customer' | 'admin') => {
-    setIsLogin(true);
-    if (demoType === 'customer') {
-      setEmail('arjun.sharma@example.com');
-      setPassword('Customer@123');
-    } else {
-      setEmail('admin@mandirveda.com');
-      setPassword('Admin@123456');
     }
   };
 
@@ -94,6 +98,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
               : 'Join PujaSathi for personalized sankalpa and ceremony updates'}
           </p>
         </div>
+
+        {promptMessage && (
+          <div className="mb-4 p-3.5 rounded-xl bg-amber-50/90 border border-amber-300 text-amber-950 text-xs flex items-start gap-2.5 shadow-2xs">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-900">Sign In or Create Account Required</p>
+              <p className="text-[#57534E] text-[11px] mt-0.5 leading-relaxed">{promptMessage}</p>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
@@ -190,40 +204,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
           </button>
         </form>
 
-        {/* Quick Demo Logins for Testing */}
-        <div className="mt-5 pt-4 border-t border-[#E7DCCE]">
-          <div className="text-[11px] text-center text-[#78716C] mb-2 font-medium">
-            Quick Testing Credentials:
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => fillQuickDemo('customer')}
-              className="py-1.5 px-3 bg-white border border-[#D1BA9C] hover:bg-[#FEF3C7] rounded-lg text-left text-[11px] text-[#44403C] transition-colors cursor-pointer"
-            >
-              <span className="font-semibold text-[#9A3412] block truncate">👤 Devotee Account</span>
-              <span className="text-[#78716C] text-[10px] truncate block">arjun.sharma@example.com</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillQuickDemo('admin')}
-              className="py-1.5 px-3 bg-white border border-[#D1BA9C] hover:bg-[#FEF3C7] rounded-lg text-left text-[11px] text-[#44403C] transition-colors cursor-pointer"
-            >
-              <span className="font-semibold text-[#78350F] block truncate">🛡️ Admin Account</span>
-              <span className="text-[#78716C] text-[10px] truncate block">admin@mandirveda.com</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 text-center">
+        <div className="mt-5 pt-3 border-t border-[#E7DCCE] text-center">
           <button
             onClick={() => {
               setIsLogin(!isLogin);
               setError('');
             }}
-            className="text-xs text-[#9A3412] hover:underline cursor-pointer"
+            className="text-xs text-[#9A3412] font-semibold hover:underline cursor-pointer"
           >
-            {isLogin ? "Don't have an account? Register here" : 'Already registered? Sign in here'}
+            {isLogin ? "Don't have an account? Create one here" : 'Already have an account? Sign in here'}
           </button>
         </div>
       </div>

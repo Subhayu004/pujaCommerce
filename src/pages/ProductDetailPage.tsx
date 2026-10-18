@@ -1,22 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ShoppingBag, Check, ShieldCheck, Truck, RefreshCcw } from 'lucide-react';
 import { Product } from '../types';
 import { ProductArt } from '../components/SpiritualArt';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 interface ProductDetailPageProps {
   product: Product | null;
+  slug?: string;
   onNavigate: (route: string) => void;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
-  product,
+  product: initialProduct,
+  slug,
   onNavigate,
 }) => {
   const { addProductToCart } = useCart();
+  const { user, openAuthModal } = useAuth();
+  const [product, setProduct] = useState<Product | null>(initialProduct);
+  const [isLoading, setIsLoading] = useState(!initialProduct && !!slug);
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [addedSuccess, setAddedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (initialProduct) {
+      setProduct(initialProduct);
+      setIsLoading(false);
+    } else if (slug) {
+      setIsLoading(true);
+      fetch(`/api/products/${slug}`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.product) setProduct(data.product);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+    }
+  }, [initialProduct, slug]);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 border-3 border-[#9A3412] border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-[#78716C]">Loading sacred puja samagri item...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -37,6 +68,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   const handleAddToCart = async () => {
+    if (!user) {
+      openAuthModal('Please sign in or create an account to add items to your cart.', () => {
+        addProductToCart(product.id, quantity);
+      });
+      return;
+    }
     setIsAdding(true);
     const res = await addProductToCart(product.id, quantity);
     setIsAdding(false);
@@ -145,6 +182,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
               <button
                 onClick={async () => {
+                  if (!user) {
+                    openAuthModal('Please sign in or create an account to view and manage your cart.', async () => {
+                      await addProductToCart(product.id, quantity);
+                      onNavigate('/cart');
+                    });
+                    return;
+                  }
                   setIsAdding(true);
                   await addProductToCart(product.id, quantity);
                   setIsAdding(false);

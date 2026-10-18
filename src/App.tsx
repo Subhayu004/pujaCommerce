@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -22,17 +22,42 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { Puja, Product, Pujari } from './types';
 
 export function AppContent() {
+  const { user, authModalOpen, authPromptMessage, openAuthModal, closeAuthModal } = useAuth();
+
   const [currentRoute, setCurrentRoute] = useState<string>(() => {
     return window.location.pathname || '/';
   });
 
-  const [pujas, setPujas] = useState<Puja[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [pujaris, setPujaris] = useState<Pujari[]>([]);
+  // Initialize from cache for instant render without blank states on page reload
+  const [pujas, setPujas] = useState<Puja[]>(() => {
+    try {
+      const cached = localStorage.getItem('pujasathi_cached_pujas');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const cached = localStorage.getItem('pujasathi_cached_products');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [pujaris, setPujaris] = useState<Pujari[]>(() => {
+    try {
+      const cached = localStorage.getItem('pujasathi_cached_pujaris');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Modals
   const [bookingPuja, setBookingPuja] = useState<Puja | null>(null);
-  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
 
   // Sync route with window popstate
   useEffect(() => {
@@ -53,34 +78,58 @@ export function AppContent() {
 
   // Re-fetch catalog data whenever route changes or admin updates
   const refreshCatalog = () => {
-    fetch('/api/pujas')
+    fetch('/api/pujas', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        if (data.pujas) setPujas(data.pujas);
+        if (data.pujas && Array.isArray(data.pujas)) {
+          setPujas(data.pujas);
+          try {
+            localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(data.pujas));
+          } catch {}
+        }
       })
       .catch((err) => console.error(err));
 
-    fetch('/api/products')
+    fetch('/api/products', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        if (data.products) setProducts(data.products);
+        if (data.products && Array.isArray(data.products)) {
+          setProducts(data.products);
+          try {
+            localStorage.setItem('pujasathi_cached_products', JSON.stringify(data.products));
+          } catch {}
+        }
       })
       .catch((err) => console.error(err));
 
-    fetch('/api/pujaris')
+    fetch('/api/pujaris', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        if (data.pujaris) setPujaris(data.pujaris);
+        if (data.pujaris && Array.isArray(data.pujaris)) {
+          setPujaris(data.pujaris);
+          try {
+            localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(data.pujaris));
+          } catch {}
+        }
       })
       .catch((err) => console.error(err));
   };
 
   useEffect(() => {
     refreshCatalog();
+    const handleCatalogUpdate = () => refreshCatalog();
+    window.addEventListener('catalogUpdated', handleCatalogUpdate);
+    return () => window.removeEventListener('catalogUpdated', handleCatalogUpdate);
   }, [currentRoute]);
 
-  // Booking initiation: opens BookingModal directly without intrusive prompt dialog
+  // Booking initiation: requires devotee authentication to book a puja
   const handleInitiateBookPuja = (puja: Puja) => {
+    if (!user) {
+      openAuthModal('Please sign in or create an account to book your Vedic Puja ceremony.', () => {
+        setBookingPuja(puja);
+      });
+      return;
+    }
     setBookingPuja(puja);
   };
 
@@ -111,6 +160,7 @@ export function AppContent() {
       const singlePuja = pujas.find((p) => p.slug === slug) || null;
       return (
         <PujaDetailPage
+          slug={slug}
           puja={singlePuja}
           onBookPuja={handleInitiateBookPuja}
           onNavigate={navigate}
@@ -122,7 +172,7 @@ export function AppContent() {
     if (currentRoute.startsWith('/puja-shop/')) {
       const slug = currentRoute.replace('/puja-shop/', '');
       const singleProduct = products.find((p) => p.slug === slug) || null;
-      return <ProductDetailPage product={singleProduct} onNavigate={navigate} />;
+      return <ProductDetailPage slug={slug} product={singleProduct} onNavigate={navigate} />;
     }
 
     // 5. Pujari Profile / Directory
@@ -165,7 +215,7 @@ export function AppContent() {
 
     // 10. Account
     if (currentRoute === '/account' || currentRoute.startsWith('/account/')) {
-      return <AccountPage onNavigate={navigate} onOpenAuth={() => setAuthModalOpen(true)} />;
+      return <AccountPage onNavigate={navigate} onOpenAuth={() => openAuthModal()} />;
     }
 
     // Default: Homepage
@@ -185,7 +235,7 @@ export function AppContent() {
       <Navbar
         currentRoute={currentRoute}
         onNavigate={navigate}
-        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenAuth={() => openAuthModal()}
       />
 
       <main className="flex-1">
@@ -207,7 +257,8 @@ export function AppContent() {
       {/* Auth Modal */}
       <AuthModal
         isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
+        onClose={closeAuthModal}
+        promptMessage={authPromptMessage}
         onNavigate={navigate}
       />
     </div>

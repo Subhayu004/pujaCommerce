@@ -101,8 +101,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate, onOpen
                 className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold transition-colors flex items-center gap-1 sm:gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
               >
                 <UserIcon className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline sm:inline">My Account</span>
-                <span className="inline xs:hidden sm:hidden">Sign In</span>
+                <span className="hidden sm:inline">Sign In / Register</span>
+                <span className="inline sm:hidden">Sign In</span>
               </button>
             )}
 

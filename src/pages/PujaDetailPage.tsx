@@ -1,19 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, ShieldCheck, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { Puja } from '../types';
 import { RudrabhishekArt, GrihaPraveshArt, SatyanarayanArt, LakshmiKuberArt } from '../components/SpiritualArt';
 
 interface PujaDetailPageProps {
   puja: Puja | null;
+  slug?: string;
   onBookPuja: (puja: Puja) => void;
   onNavigate: (route: string) => void;
 }
 
 export const PujaDetailPage: React.FC<PujaDetailPageProps> = ({
-  puja,
+  puja: initialPuja,
+  slug,
   onBookPuja,
   onNavigate,
 }) => {
+  const [puja, setPuja] = useState<Puja | null>(initialPuja);
+  const [isLoading, setIsLoading] = useState(!initialPuja && !!slug);
+
+  useEffect(() => {
+    if (initialPuja) {
+      setPuja(initialPuja);
+      setIsLoading(false);
+    } else if (slug) {
+      setIsLoading(true);
+      fetch(`/api/pujas/${slug}`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.puja) setPuja(data.puja);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+    }
+  }, [initialPuja, slug]);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 border-3 border-[#9A3412] border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-[#78716C]">Loading sacred puja ritual details...</p>
+      </div>
+    );
+  }
+
   if (!puja) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center">

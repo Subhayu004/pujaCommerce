@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, AlertCircle, Loader2, Plus, Minus, Sparkles } from 'lucide-react';
 import { Puja, Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { ProductArt } from './SpiritualArt';
 
 interface BookingModalProps {
@@ -19,6 +20,7 @@ const TIME_SLOTS = [
 
 export const BookingModal: React.FC<BookingModalProps> = ({ puja, onClose, onNavigate }) => {
   const { addPujaToCart } = useCart();
+  const { user, openAuthModal } = useAuth();
 
   // Set default date to tomorrow
   const tomorrow = new Date();
@@ -99,6 +101,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ puja, onClose, onNav
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      openAuthModal('Please sign in or create an account to finalize and reserve your sacred puja ceremony.');
+      return;
+    }
     setErrorMessage('');
     setIsSubmitting(true);
 

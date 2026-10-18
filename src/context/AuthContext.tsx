@@ -5,6 +5,11 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  authModalOpen: boolean;
+  authPromptMessage: string;
+  openAuthModal: (promptMessage?: string, onComplete?: () => void) => void;
+  closeAuthModal: () => void;
+  pendingAction: (() => void) | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -37,6 +42,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return localStorage.getItem('mv_session_token');
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [authPromptMessage, setAuthPromptMessage] = useState<string>('');
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  const openAuthModal = (message?: string, onComplete?: () => void) => {
+    setAuthPromptMessage(message || '');
+    if (onComplete) {
+      setPendingAction(() => onComplete);
+    } else {
+      setPendingAction(null);
+    }
+    setAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setAuthModalOpen(false);
+    setAuthPromptMessage('');
+    setPendingAction(null);
+  };
 
   const getAuthHeaders = (): Record<string, string> => {
     const currentToken = token || localStorage.getItem('mv_session_token');
@@ -108,6 +132,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setUser(data.user);
+      if (pendingAction) {
+        try {
+          pendingAction();
+        } catch (e) {
+          console.error(e);
+        }
+        setPendingAction(null);
+      }
+      setAuthModalOpen(false);
+      setAuthPromptMessage('');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error during login' };
@@ -138,6 +172,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setUser(data.user);
+      if (pendingAction) {
+        try {
+          pendingAction();
+        } catch (e) {
+          console.error(e);
+        }
+        setPendingAction(null);
+      }
+      setAuthModalOpen(false);
+      setAuthPromptMessage('');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error during registration' };
@@ -167,11 +211,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {}
       setToken(null);
       setUser(null);
+      setAuthModalOpen(false);
+      setPendingAction(null);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, refreshUser, getAuthHeaders }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        authModalOpen,
+        authPromptMessage,
+        openAuthModal,
+        closeAuthModal,
+        pendingAction,
+        login,
+        register,
+        logout,
+        refreshUser,
+        getAuthHeaders,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
