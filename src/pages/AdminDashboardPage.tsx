@@ -85,9 +85,59 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [bookingsList, setBookingsList] = useState<any[]>([]);
-  const [pujasList, setPujasList] = useState<Puja[]>([]);
-  const [productsList, setProductsList] = useState<Product[]>([]);
-  const [pujarisList, setPujarisList] = useState<Pujari[]>([]);
+  const [pujasList, setPujasList] = useState<Puja[]>(() => {
+    try {
+      const cached = localStorage.getItem('pujasathi_cached_pujas');
+      const custom = localStorage.getItem('pujasathi_custom_pujas');
+      const base: Puja[] = cached ? JSON.parse(cached) : [];
+      const extra: Puja[] = custom ? JSON.parse(custom) : [];
+      const merged = [...base];
+      for (const item of extra) {
+        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
+        if (idx >= 0) merged[idx] = item;
+        else merged.unshift(item);
+      }
+      return merged;
+    } catch {
+      return [];
+    }
+  });
+
+  const [productsList, setProductsList] = useState<Product[]>(() => {
+    try {
+      const cached = localStorage.getItem('pujasathi_cached_products');
+      const custom = localStorage.getItem('pujasathi_custom_products');
+      const base: Product[] = cached ? JSON.parse(cached) : [];
+      const extra: Product[] = custom ? JSON.parse(custom) : [];
+      const merged = [...base];
+      for (const item of extra) {
+        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
+        if (idx >= 0) merged[idx] = item;
+        else merged.unshift(item);
+      }
+      return merged;
+    } catch {
+      return [];
+    }
+  });
+
+  const [pujarisList, setPujarisList] = useState<Pujari[]>(() => {
+    try {
+      const cached = localStorage.getItem('pujasathi_cached_pujaris');
+      const custom = localStorage.getItem('pujasathi_custom_pujaris');
+      const base: Pujari[] = cached ? JSON.parse(cached) : [];
+      const extra: Pujari[] = custom ? JSON.parse(custom) : [];
+      const merged = [...base];
+      for (const item of extra) {
+        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
+        if (idx >= 0) merged[idx] = item;
+        else merged.unshift(item);
+      }
+      return merged;
+    } catch {
+      return [];
+    }
+  });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   // Filters & Search
@@ -323,36 +373,90 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       // 3. Pujas catalog
       const puCatalogRes = await safeFetchJson('/api/admin/pujas');
+      let basePujas: Puja[] = [];
       if (puCatalogRes.ok && puCatalogRes.data?.pujas) {
-        setPujasList(puCatalogRes.data.pujas || []);
+        basePujas = puCatalogRes.data.pujas || [];
       } else {
         const puFallback = await safeFetchJson('/api/pujas');
         if (puFallback.ok && puFallback.data?.pujas) {
-          setPujasList(puFallback.data.pujas || []);
+          basePujas = puFallback.data.pujas || [];
         }
       }
+
+      let customPujas: Puja[] = [];
+      try {
+        const raw = localStorage.getItem('pujasathi_custom_pujas');
+        if (raw) customPujas = JSON.parse(raw);
+      } catch {}
+
+      const mergedPujas = [...basePujas];
+      for (const cp of customPujas) {
+        const idx = mergedPujas.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
+        if (idx >= 0) {
+          mergedPujas[idx] = cp;
+        } else {
+          mergedPujas.unshift(cp);
+        }
+      }
+      setPujasList(mergedPujas);
 
       // 4. Products catalog
       const pRes = await safeFetchJson('/api/admin/products');
+      let baseProducts: Product[] = [];
       if (pRes.ok && pRes.data?.products) {
-        setProductsList(pRes.data.products || []);
+        baseProducts = pRes.data.products || [];
       } else {
         const pFallback = await safeFetchJson('/api/products');
         if (pFallback.ok && pFallback.data?.products) {
-          setProductsList(pFallback.data.products || []);
+          baseProducts = pFallback.data.products || [];
         }
       }
 
+      let customProducts: Product[] = [];
+      try {
+        const raw = localStorage.getItem('pujasathi_custom_products');
+        if (raw) customProducts = JSON.parse(raw);
+      } catch {}
+
+      const mergedProducts = [...baseProducts];
+      for (const cp of customProducts) {
+        const idx = mergedProducts.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
+        if (idx >= 0) {
+          mergedProducts[idx] = cp;
+        } else {
+          mergedProducts.unshift(cp);
+        }
+      }
+      setProductsList(mergedProducts);
+
       // 5. Pujaris
       const puRes = await safeFetchJson('/api/admin/pujaris');
+      let basePujaris: Pujari[] = [];
       if (puRes.ok && puRes.data?.pujaris) {
-        setPujarisList(puRes.data.pujaris || []);
+        basePujaris = puRes.data.pujaris || [];
       } else {
         const puFallback = await safeFetchJson('/api/pujaris');
         if (puFallback.ok && puFallback.data?.pujaris) {
-          setPujarisList(puFallback.data.pujaris || []);
+          basePujaris = puFallback.data.pujaris || [];
         }
       }
+
+      let customPujaris: Pujari[] = [];
+      try {
+        const raw = localStorage.getItem('pujasathi_custom_pujaris');
+        if (raw) customPujaris = JSON.parse(raw);
+      } catch {}
+
+      const mergedPujaris = [...basePujaris];
+      for (const cp of customPujaris) {
+        const idx = mergedPujaris.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
+        if (idx >= 0) {
+          mergedPujaris[idx] = cp;
+        } else {
+          mergedPujaris.unshift(cp);
+        }
+      }
+      setPujarisList(mergedPujaris);
 
       // 6. Audit Logs
       const aRes = await safeFetchJson('/api/admin/audit-logs');
