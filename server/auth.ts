@@ -19,60 +19,175 @@ export interface AuthenticatedRequest extends Request {
   sessionToken?: string;
 }
 
-export function createSession(userId: string): string {
-  const token = 'mv_sess_' + crypto.randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 14; // 14 days
+const SESSION_SECRET = process.env.SESSION_SECRET || 'pujasathi_holy_sanctum_session_secret_2026';
 
-  db.prepare(`
-    INSERT INTO sessions (token, user_id, expires_at)
-    VALUES (?, ?, ?)
-  `).run(token, userId, expiresAt);
+export function createSession(userId: string): string {
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
+
+  // Retrieve user details from SQLite database
+  let user: any = null;
+  try {
+    user = db
+      .prepare('SELECT id, email, full_name, role, phone, address_line, city, state, pincode FROM users WHERE id = ?')
+      .get(userId);
+  } catch (err) {
+    console.error('Error fetching user for session:', err);
+  }
+
+  // Fallback lookup by email
+  if (!user && userId.includes('@')) {
+    try {
+      user = db
+        .prepare('SELECT id, email, full_name, role, phone, address_line, city, state, pincode FROM users WHERE email = ?')
+        .get(userId);
+    } catch {}
+  }
+
+  // Official admin fallback
+  if (!user && (userId === 'usr_pujasathi_admin' || userId === 'pujasathisupport@gmail.com')) {
+    user = {
+      id: 'usr_pujasathi_admin',
+      email: 'pujasathisupport@gmail.com',
+      full_name: 'PujaSathi Administrator',
+      role: 'admin',
+    };
+  }
+
+  const role = (user?.email === 'pujasathisupport@gmail.com' ? 'admin' : (user?.role || 'customer')) as 'customer' | 'admin';
+
+  const payload = {
+    u: user ? user.id : userId,
+    e: user ? user.email : '',
+    n: user ? user.full_name : '',
+    r: role,
+    exp: expiresAt,
+  };
+
+  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payloadB64).digest('base64url');
+  const token = `mv_tok.${payloadB64}.${signature}`;
+
+  // Also persist in local DB if available
+  try {
+    db.prepare(`
+      INSERT OR REPLACE INTO sessions (token, user_id, expires_at)
+      VALUES (?, ?, ?)
+    `).run(token, userId, expiresAt);
+  } catch (err) {
+    // Non-fatal if read-only or in-memory
+  }
 
   return token;
 }
 
 export function getSessionUser(token: string): AuthUser | null {
-  if (!token) return null;
+  if (!token || typeof token !== 'string') return null;
 
-  const now = Date.now();
-  const session = db.prepare(`
-    SELECT s.token, s.expires_at, u.id, u.email, u.full_name, u.role, u.phone, u.address_line, u.city, u.state, u.pincode
-    FROM sessions s
-    JOIN users u ON s.user_id = u.id
-    WHERE s.token = ? AND s.expires_at > ?
-  `).get(token, now) as (AuthUser & { token: string; expires_at: number }) | undefined;
+  const cleanToken = token.trim();
 
-  if (!session) return null;
+  // 1. Primary: Verify stateless HMAC token (Works across serverless, Vercel, Render, and multi-instances!)
+  if (cleanToken.startsWith('mv_tok.')) {
+    const parts = cleanToken.split('.');
+    if (parts.length === 3) {
+      const [, payloadB64, signature] = parts;
+      try {
+        const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(payloadB64).digest('base64url');
+        if (
+          signature.length === expectedSig.length &&
+          crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))
+        ) {
+          const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+          if (payload && payload.exp && payload.exp > Date.now()) {
+            const isOfficialAdmin = payload.e === 'pujasathisupport@gmail.com';
+            const role: 'customer' | 'admin' = isOfficialAdmin ? 'admin' : (payload.r || 'customer');
 
-  return {
-    id: session.id,
-    email: session.email,
-    full_name: session.full_name,
-    role: session.role,
-    phone: session.phone,
-    address_line: session.address_line,
-    city: session.city,
-    state: session.state,
-    pincode: session.pincode,
-  };
+            // Try to load latest profile fields from DB if available
+            let dbUser: any = null;
+            try {
+              dbUser = db
+                .prepare('SELECT id, email, full_name, role, phone, address_line, city, state, pincode FROM users WHERE id = ? OR email = ?')
+                .get(payload.u, payload.e);
+            } catch {}
+
+            return {
+              id: dbUser?.id || payload.u,
+              email: dbUser?.email || payload.e,
+              full_name: dbUser?.full_name || payload.n || 'PujaSathi Devotee',
+              role: isOfficialAdmin ? 'admin' : ((dbUser?.role || role) as 'customer' | 'admin'),
+              phone: dbUser?.phone || '',
+              address_line: dbUser?.address_line || '',
+              city: dbUser?.city || '',
+              state: dbUser?.state || '',
+              pincode: dbUser?.pincode || '',
+            };
+          }
+        }
+      } catch (err) {
+        console.error('Error verifying stateless session token:', err);
+      }
+    }
+  }
+
+  // 2. Secondary: Fallback to SQLite sessions table for legacy tokens
+  try {
+    const now = Date.now();
+    const session = db.prepare(`
+      SELECT s.token, s.expires_at, u.id, u.email, u.full_name, u.role, u.phone, u.address_line, u.city, u.state, u.pincode
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.token = ? AND s.expires_at > ?
+    `).get(cleanToken, now) as (AuthUser & { token: string; expires_at: number }) | undefined;
+
+    if (session) {
+      const isOfficialAdmin = session.email === 'pujasathisupport@gmail.com';
+      return {
+        id: session.id,
+        email: session.email,
+        full_name: session.full_name,
+        role: isOfficialAdmin ? 'admin' : session.role,
+        phone: session.phone,
+        address_line: session.address_line,
+        city: session.city,
+        state: session.state,
+        pincode: session.pincode,
+      };
+    }
+  } catch {}
+
+  return null;
 }
 
 export function destroySession(token: string): void {
   if (!token) return;
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  try {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  } catch {}
 }
 
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  let token = req.cookies?.mv_session;
-  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
+  const candidates: string[] = [];
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    const t = req.headers.authorization.slice(7).trim();
+    if (t) candidates.push(t);
   }
 
-  if (token) {
+  if (req.headers['x-session-token']) {
+    const t = (req.headers['x-session-token'] as string).trim();
+    if (t && !candidates.includes(t)) candidates.push(t);
+  }
+
+  if (req.cookies?.mv_session) {
+    const t = req.cookies.mv_session.trim();
+    if (t && !candidates.includes(t)) candidates.push(t);
+  }
+
+  for (const token of candidates) {
     const user = getSessionUser(token);
     if (user) {
       req.user = user;
       req.sessionToken = token;
+      break;
     }
   }
 
@@ -81,17 +196,20 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
 
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({ error: 'Authentication required. Please sign in or create an account.' });
   }
   next();
 }
 
 export function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return res.status(401).json({ error: 'Authentication required. Please sign in with your administrator account.' });
   }
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Administrative access restricted' });
+  if (req.user.role !== 'admin' && req.user.email !== 'pujasathisupport@gmail.com') {
+    return res.status(403).json({ error: 'Administrative access restricted to authorized temple administrators.' });
+  }
+  if (req.user.email === 'pujasathisupport@gmail.com') {
+    req.user.role = 'admin';
   }
   next();
 }

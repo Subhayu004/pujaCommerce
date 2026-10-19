@@ -63,23 +63,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getAuthHeaders = (): Record<string, string> => {
-    const currentToken = token || localStorage.getItem('mv_session_token');
+    const currentToken = token || (typeof window !== 'undefined' ? localStorage.getItem('mv_session_token') : null);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     };
     if (currentToken) {
       headers['Authorization'] = `Bearer ${currentToken}`;
+      headers['x-session-token'] = currentToken;
     }
     return headers;
   };
 
   const refreshUser = async () => {
     try {
-      const currentToken = localStorage.getItem('mv_session_token');
+      const currentToken = typeof window !== 'undefined' ? localStorage.getItem('mv_session_token') : null;
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (currentToken) {
         headers['Authorization'] = `Bearer ${currentToken}`;
+        headers['x-session-token'] = currentToken;
       }
 
       const res = await fetch('/api/auth/me', {

@@ -191,7 +191,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}`, 'x-session-token': token } : {}),
         ...authHeaders,
         ...((init.headers as Record<string, string>) || {}),
       };
