@@ -1691,21 +1691,49 @@ apiRouter.delete('/admin/products/:id', requireAdmin, (req: AuthenticatedRequest
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  db.prepare('UPDATE products SET is_active = 0 WHERE id = ?').run(id);
+  // Remove attached image if uploaded
+  if (product.image && typeof product.image === 'string' && product.image.startsWith('/uploads/')) {
+    try {
+      const filename = path.basename(product.image);
+      const filePath = path.resolve(process.cwd(), 'uploads', filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.error('Error removing product image file:', err);
+    }
+  }
+
+  // Clean cart items
+  try {
+    db.prepare('DELETE FROM cart_items WHERE product_id = ?').run(id);
+  } catch {}
+
+  // Nullify in order items
+  try {
+    db.prepare('UPDATE order_items SET product_id = NULL WHERE product_id = ?').run(id);
+  } catch {}
+
+  // Delete product permanently
+  try {
+    db.prepare('DELETE FROM products WHERE id = ?').run(id);
+  } catch (err) {
+    db.prepare('UPDATE products SET is_active = 0 WHERE id = ?').run(id);
+  }
 
   // Audit log
   db.prepare(`
     INSERT INTO audit_logs (id, admin_id, admin_email, action, entity_type, entity_id, details)
-    VALUES (?, ?, ?, 'DEACTIVATE_PRODUCT', 'product', ?, ?)
+    VALUES (?, ?, ?, 'DELETE_PRODUCT', 'product', ?, ?)
   `).run(
     'aud_' + crypto.randomBytes(8).toString('hex'),
     req.user!.id,
     req.user!.email,
     id,
-    `Deactivated Product: ${product.name}`
+    `Deleted Product: ${product.name}`
   );
 
-  return res.json({ success: true, message: `Product ${product.name} deactivated successfully` });
+  return res.json({ success: true, message: `Product ${product.name} deleted successfully` });
 });
 
 // Admin Product Inventory Quick Stock Update
@@ -1989,21 +2017,44 @@ apiRouter.delete('/admin/pujaris/:id', requireAdmin, (req: AuthenticatedRequest,
     return res.status(404).json({ error: 'Pujari not found' });
   }
 
-  db.prepare('UPDATE pujaris SET is_active = 0 WHERE id = ?').run(id);
+  // Remove attached photo if uploaded
+  if (pujari.photo && typeof pujari.photo === 'string' && pujari.photo.startsWith('/uploads/')) {
+    try {
+      const filename = path.basename(pujari.photo);
+      const filePath = path.resolve(process.cwd(), 'uploads', filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.error('Error removing pujari photo file:', err);
+    }
+  }
+
+  // Nullify in order items
+  try {
+    db.prepare('UPDATE order_items SET pujari_id = NULL WHERE pujari_id = ?').run(id);
+  } catch {}
+
+  // Delete pujari permanently
+  try {
+    db.prepare('DELETE FROM pujaris WHERE id = ?').run(id);
+  } catch (err) {
+    db.prepare('UPDATE pujaris SET is_active = 0 WHERE id = ?').run(id);
+  }
 
   // Audit log
   db.prepare(`
     INSERT INTO audit_logs (id, admin_id, admin_email, action, entity_type, entity_id, details)
-    VALUES (?, ?, ?, 'DEACTIVATE_PUJARI', 'pujari', ?, ?)
+    VALUES (?, ?, ?, 'DELETE_PUJARI', 'pujari', ?, ?)
   `).run(
     'aud_' + crypto.randomBytes(8).toString('hex'),
     req.user!.id,
     req.user!.email,
     id,
-    `Deactivated Acharya profile: ${pujari.name}`
+    `Deleted Acharya profile: ${pujari.name}`
   );
 
-  return res.json({ success: true, message: `Acharya ${pujari.name} deactivated successfully` });
+  return res.json({ success: true, message: `Acharya ${pujari.name} deleted successfully` });
 });
 
 // ==========================================

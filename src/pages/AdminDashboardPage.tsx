@@ -389,6 +389,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         if (raw) customPujas = JSON.parse(raw);
       } catch {}
 
+      let deletedPujas: string[] = [];
+      try {
+        const rawDel = localStorage.getItem('pujasathi_deleted_pujas');
+        if (rawDel) deletedPujas = JSON.parse(rawDel);
+      } catch {}
+
       const mergedPujas = [...basePujas];
       for (const cp of customPujas) {
         const idx = mergedPujas.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
@@ -398,7 +404,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           mergedPujas.unshift(cp);
         }
       }
-      setPujasList(mergedPujas);
+      setPujasList(mergedPujas.filter((p) => !deletedPujas.includes(p.id) && !deletedPujas.includes(p.slug)));
 
       // 4. Products catalog
       const pRes = await safeFetchJson('/api/admin/products');
@@ -418,6 +424,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         if (raw) customProducts = JSON.parse(raw);
       } catch {}
 
+      let deletedProducts: string[] = [];
+      try {
+        const rawDel = localStorage.getItem('pujasathi_deleted_products');
+        if (rawDel) deletedProducts = JSON.parse(rawDel);
+      } catch {}
+
       const mergedProducts = [...baseProducts];
       for (const cp of customProducts) {
         const idx = mergedProducts.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
@@ -427,7 +439,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           mergedProducts.unshift(cp);
         }
       }
-      setProductsList(mergedProducts);
+      setProductsList(mergedProducts.filter((p) => !deletedProducts.includes(p.id) && !deletedProducts.includes(p.slug)));
 
       // 5. Pujaris
       const puRes = await safeFetchJson('/api/admin/pujaris');
@@ -447,6 +459,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         if (raw) customPujaris = JSON.parse(raw);
       } catch {}
 
+      let deletedPujaris: string[] = [];
+      try {
+        const rawDel = localStorage.getItem('pujasathi_deleted_pujaris');
+        if (rawDel) deletedPujaris = JSON.parse(rawDel);
+      } catch {}
+
       const mergedPujaris = [...basePujaris];
       for (const cp of customPujaris) {
         const idx = mergedPujaris.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
@@ -456,7 +474,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           mergedPujaris.unshift(cp);
         }
       }
-      setPujarisList(mergedPujaris);
+      setPujarisList(mergedPujaris.filter((p) => !deletedPujaris.includes(p.id) && !deletedPujaris.includes(p.slug)));
 
       // 6. Audit Logs
       const aRes = await safeFetchJson('/api/admin/audit-logs');
@@ -748,30 +766,46 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const confirmDeletePuja = async (puja: Puja) => {
     setIsDeletingPuja(true);
     try {
-      const res = await safeFetchJson(`/api/admin/pujas/${puja.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        try {
-          const raw = localStorage.getItem('pujasathi_custom_pujas');
-          if (raw) {
-            const custom: Puja[] = JSON.parse(raw);
-            const filtered = custom.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
-            localStorage.setItem('pujasathi_custom_pujas', JSON.stringify(filtered));
-          }
-        } catch {}
-        setActionSuccess(`Puja "${puja.name}" and any attached image deleted successfully.`);
-        setTimeout(() => setActionSuccess(''), 4000);
-        setPujasList((prev) => prev.filter((p) => p.id !== puja.id));
-        loadAdminData();
-        onCatalogUpdated?.();
-        if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
-      } else {
-        setActionError(res.data?.error || 'Failed to delete puja');
-        setTimeout(() => setActionError(''), 4000);
+      try {
+        const rawCustom = localStorage.getItem('pujasathi_custom_pujas');
+        if (rawCustom) {
+          const custom: Puja[] = JSON.parse(rawCustom);
+          const filtered = custom.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
+          localStorage.setItem('pujasathi_custom_pujas', JSON.stringify(filtered));
+        }
+
+        const rawCached = localStorage.getItem('pujasathi_cached_pujas');
+        if (rawCached) {
+          const cached: Puja[] = JSON.parse(rawCached);
+          const filtered = cached.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
+          localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(filtered));
+        }
+
+        const rawDeleted = localStorage.getItem('pujasathi_deleted_pujas');
+        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
+        if (!deletedList.includes(puja.id)) deletedList.push(puja.id);
+        if (puja.slug && !deletedList.includes(puja.slug)) deletedList.push(puja.slug);
+        localStorage.setItem('pujasathi_deleted_pujas', JSON.stringify(deletedList));
+      } catch (e) {
+        console.error(e);
       }
+
+      setPujasList((prev) => prev.filter((p) => p.id !== puja.id && p.slug !== puja.slug));
+      setActionSuccess(`Puja "${puja.name}" deleted successfully.`);
+      setTimeout(() => setActionSuccess(''), 4000);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('catalogUpdated', {
+            detail: { type: 'puja_delete', id: puja.id, slug: puja.slug },
+          })
+        );
+      }
+      onCatalogUpdated?.();
+
+      await safeFetchJson(`/api/admin/pujas/${puja.id}`, { method: 'DELETE' });
     } catch (err: any) {
       console.error(err);
-      setActionError(err.message || 'Error deleting puja');
-      setTimeout(() => setActionError(''), 4000);
     } finally {
       setIsDeletingPuja(false);
       setPujaToDelete(null);
@@ -924,30 +958,46 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const confirmDeleteProduct = async (prod: Product) => {
     setIsDeletingProduct(true);
     try {
-      const res = await safeFetchJson(`/api/admin/products/${prod.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        try {
-          const raw = localStorage.getItem('pujasathi_custom_products');
-          if (raw) {
-            const custom: Product[] = JSON.parse(raw);
-            const filtered = custom.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
-            localStorage.setItem('pujasathi_custom_products', JSON.stringify(filtered));
-          }
-        } catch {}
-        setActionSuccess(`Essential item "${prod.name}" removed successfully.`);
-        setTimeout(() => setActionSuccess(''), 4000);
-        setProductsList((prev) => prev.filter((p) => p.id !== prod.id));
-        loadAdminData();
-        onCatalogUpdated?.();
-        if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
-      } else {
-        setActionError(res.data?.error || 'Failed to remove product');
-        setTimeout(() => setActionError(''), 4000);
+      try {
+        const rawCustom = localStorage.getItem('pujasathi_custom_products');
+        if (rawCustom) {
+          const custom: Product[] = JSON.parse(rawCustom);
+          const filtered = custom.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
+          localStorage.setItem('pujasathi_custom_products', JSON.stringify(filtered));
+        }
+
+        const rawCached = localStorage.getItem('pujasathi_cached_products');
+        if (rawCached) {
+          const cached: Product[] = JSON.parse(rawCached);
+          const filtered = cached.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
+          localStorage.setItem('pujasathi_cached_products', JSON.stringify(filtered));
+        }
+
+        const rawDeleted = localStorage.getItem('pujasathi_deleted_products');
+        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
+        if (!deletedList.includes(prod.id)) deletedList.push(prod.id);
+        if (prod.slug && !deletedList.includes(prod.slug)) deletedList.push(prod.slug);
+        localStorage.setItem('pujasathi_deleted_products', JSON.stringify(deletedList));
+      } catch (e) {
+        console.error(e);
       }
+
+      setProductsList((prev) => prev.filter((p) => p.id !== prod.id && p.slug !== prod.slug));
+      setActionSuccess(`Essential item "${prod.name}" removed successfully.`);
+      setTimeout(() => setActionSuccess(''), 4000);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('catalogUpdated', {
+            detail: { type: 'product_delete', id: prod.id, slug: prod.slug },
+          })
+        );
+      }
+      onCatalogUpdated?.();
+
+      await safeFetchJson(`/api/admin/products/${prod.id}`, { method: 'DELETE' });
     } catch (err: any) {
       console.error(err);
-      setActionError(err.message || 'Error removing product');
-      setTimeout(() => setActionError(''), 4000);
     } finally {
       setIsDeletingProduct(false);
       setProductToDelete(null);
@@ -1136,30 +1186,46 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const confirmDeletePujari = async (pujari: Pujari) => {
     setIsDeletingPujari(true);
     try {
-      const res = await safeFetchJson(`/api/admin/pujaris/${pujari.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        try {
-          const raw = localStorage.getItem('pujasathi_custom_pujaris');
-          if (raw) {
-            const custom: Pujari[] = JSON.parse(raw);
-            const filtered = custom.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
-            localStorage.setItem('pujasathi_custom_pujaris', JSON.stringify(filtered));
-          }
-        } catch {}
-        setActionSuccess(`Acharya "${pujari.name}" removed from directory.`);
-        setTimeout(() => setActionSuccess(''), 4000);
-        setPujarisList((prev) => prev.filter((p) => p.id !== pujari.id));
-        loadAdminData();
-        onCatalogUpdated?.();
-        if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
-      } else {
-        setActionError(res.data?.error || 'Failed to remove acharya');
-        setTimeout(() => setActionError(''), 4000);
+      try {
+        const rawCustom = localStorage.getItem('pujasathi_custom_pujaris');
+        if (rawCustom) {
+          const custom: Pujari[] = JSON.parse(rawCustom);
+          const filtered = custom.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
+          localStorage.setItem('pujasathi_custom_pujaris', JSON.stringify(filtered));
+        }
+
+        const rawCached = localStorage.getItem('pujasathi_cached_pujaris');
+        if (rawCached) {
+          const cached: Pujari[] = JSON.parse(rawCached);
+          const filtered = cached.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
+          localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(filtered));
+        }
+
+        const rawDeleted = localStorage.getItem('pujasathi_deleted_pujaris');
+        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
+        if (!deletedList.includes(pujari.id)) deletedList.push(pujari.id);
+        if (pujari.slug && !deletedList.includes(pujari.slug)) deletedList.push(pujari.slug);
+        localStorage.setItem('pujasathi_deleted_pujaris', JSON.stringify(deletedList));
+      } catch (e) {
+        console.error(e);
       }
+
+      setPujarisList((prev) => prev.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug));
+      setActionSuccess(`Acharya "${pujari.name}" removed from directory.`);
+      setTimeout(() => setActionSuccess(''), 4000);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('catalogUpdated', {
+            detail: { type: 'pujari_delete', id: pujari.id, slug: pujari.slug },
+          })
+        );
+      }
+      onCatalogUpdated?.();
+
+      await safeFetchJson(`/api/admin/pujaris/${pujari.id}`, { method: 'DELETE' });
     } catch (err: any) {
       console.error(err);
-      setActionError(err.message || 'Error removing acharya');
-      setTimeout(() => setActionError(''), 4000);
     } finally {
       setIsDeletingPujari(false);
       setPujariToDelete(null);

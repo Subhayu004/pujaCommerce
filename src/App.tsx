@@ -115,6 +115,12 @@ export function AppContent() {
             if (raw) customPujas = JSON.parse(raw);
           } catch {}
 
+          let deletedPujas: string[] = [];
+          try {
+            const rawDel = localStorage.getItem('pujasathi_deleted_pujas');
+            if (rawDel) deletedPujas = JSON.parse(rawDel);
+          } catch {}
+
           const combined = [...data.pujas];
           for (const cp of customPujas) {
             const idx = combined.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
@@ -122,9 +128,10 @@ export function AppContent() {
             else combined.unshift(cp);
           }
 
-          setPujas(combined);
+          const filtered = combined.filter((p) => !deletedPujas.includes(p.id) && !deletedPujas.includes(p.slug));
+          setPujas(filtered);
           try {
-            localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(combined));
+            localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(filtered));
           } catch {}
         }
       })
@@ -140,6 +147,12 @@ export function AppContent() {
             if (raw) customProducts = JSON.parse(raw);
           } catch {}
 
+          let deletedProducts: string[] = [];
+          try {
+            const rawDel = localStorage.getItem('pujasathi_deleted_products');
+            if (rawDel) deletedProducts = JSON.parse(rawDel);
+          } catch {}
+
           const combined = [...data.products];
           for (const cp of customProducts) {
             const idx = combined.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
@@ -147,9 +160,10 @@ export function AppContent() {
             else combined.unshift(cp);
           }
 
-          setProducts(combined);
+          const filtered = combined.filter((p) => !deletedProducts.includes(p.id) && !deletedProducts.includes(p.slug));
+          setProducts(filtered);
           try {
-            localStorage.setItem('pujasathi_cached_products', JSON.stringify(combined));
+            localStorage.setItem('pujasathi_cached_products', JSON.stringify(filtered));
           } catch {}
         }
       })
@@ -165,6 +179,12 @@ export function AppContent() {
             if (raw) customPujaris = JSON.parse(raw);
           } catch {}
 
+          let deletedPujaris: string[] = [];
+          try {
+            const rawDel = localStorage.getItem('pujasathi_deleted_pujaris');
+            if (rawDel) deletedPujaris = JSON.parse(rawDel);
+          } catch {}
+
           const combined = [...data.pujaris];
           for (const cp of customPujaris) {
             const idx = combined.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
@@ -172,9 +192,10 @@ export function AppContent() {
             else combined.unshift(cp);
           }
 
-          setPujaris(combined);
+          const filtered = combined.filter((p) => !deletedPujaris.includes(p.id) && !deletedPujaris.includes(p.slug));
+          setPujaris(filtered);
           try {
-            localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(combined));
+            localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(filtered));
           } catch {}
         }
       })
@@ -196,6 +217,9 @@ export function AppContent() {
             return [e.detail.item, ...prev];
           });
         }
+        if (e.detail.type === 'puja_delete') {
+          setPujas((prev) => prev.filter((p) => p.id !== e.detail.id && p.slug !== e.detail.slug));
+        }
         if (e.detail.type === 'product' && e.detail.item) {
           setProducts((prev) => {
             const idx = prev.findIndex((p) => p.id === e.detail.item.id);
@@ -207,6 +231,9 @@ export function AppContent() {
             return [e.detail.item, ...prev];
           });
         }
+        if (e.detail.type === 'product_delete') {
+          setProducts((prev) => prev.filter((p) => p.id !== e.detail.id && p.slug !== e.detail.slug));
+        }
         if (e.detail.type === 'pujari' && e.detail.item) {
           setPujaris((prev) => {
             const idx = prev.findIndex((p) => p.id === e.detail.item.id);
@@ -217,6 +244,9 @@ export function AppContent() {
             }
             return [e.detail.item, ...prev];
           });
+        }
+        if (e.detail.type === 'pujari_delete') {
+          setPujaris((prev) => prev.filter((p) => p.id !== e.detail.id && p.slug !== e.detail.slug));
         }
       }
       refreshCatalog();
