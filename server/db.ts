@@ -1,8 +1,23 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'path';
+import fs from 'fs';
 import bcrypt from 'bcryptjs';
 
-const dbPath = path.resolve(process.cwd(), 'mandirveda.db');
+const isVercel = Boolean(process.env.VERCEL);
+let dbPath = path.resolve(process.cwd(), 'mandirveda.db');
+
+if (isVercel) {
+  const tmpDbPath = path.join('/tmp', 'mandirveda.db');
+  if (!fs.existsSync(tmpDbPath) && fs.existsSync(dbPath)) {
+    try {
+      fs.copyFileSync(dbPath, tmpDbPath);
+    } catch (e) {
+      console.error('Failed to copy database to /tmp on Vercel:', e);
+    }
+  }
+  dbPath = tmpDbPath;
+}
+
 export const db = new DatabaseSync(dbPath);
 
 // Enable WAL mode and foreign keys for high performance & ACID concurrency

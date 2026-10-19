@@ -56,7 +56,9 @@ async function startServer() {
     });
   }
 
-  const PORT = Number(process.env.PORT) || 3000;
+  // In AI Studio dev environment, dev server must run strictly on port 3000.
+  // When deployed to external platforms like Render (process.env.RENDER), use assigned PORT.
+  const PORT = process.env.RENDER ? (Number(process.env.PORT) || 3000) : 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`PujaSathi Server running on http://0.0.0.0:${PORT}`);
   });
