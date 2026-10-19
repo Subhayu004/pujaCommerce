@@ -29,7 +29,18 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       setProduct(initialProduct);
       setIsLoading(false);
     } else if (slug) {
-      setIsLoading(true);
+      // Check local cache first
+      try {
+        const rawCustom = localStorage.getItem('pujasathi_custom_products');
+        const rawCached = localStorage.getItem('pujasathi_cached_products');
+        const all = [...(rawCustom ? JSON.parse(rawCustom) : []), ...(rawCached ? JSON.parse(rawCached) : [])];
+        const found = all.find((p) => p.slug === slug || p.id === slug);
+        if (found) {
+          setProduct(found);
+          setIsLoading(false);
+        }
+      } catch {}
+
       fetch(`/api/products/${slug}`, { cache: 'no-store' })
         .then((r) => r.json())
         .then((data) => {

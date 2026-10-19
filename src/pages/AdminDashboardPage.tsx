@@ -587,6 +587,32 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       }
 
       const savedPuja = res.data?.puja;
+      const finalPuja: Puja = savedPuja || {
+        id: editingPuja ? editingPuja.id : `puj_${Date.now()}`,
+        slug: editingPuja ? editingPuja.slug : `${pujaForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+        name: payload.name,
+        deity: payload.deity,
+        short_description: payload.short_description,
+        description: payload.description,
+        price_paise: payload.price_paise,
+        duration_mins: payload.duration_mins,
+        image: payload.image,
+        required_materials: payload.required_materials,
+        booking_requirements: payload.booking_requirements,
+        is_active: payload.is_active,
+        featured: payload.featured,
+      };
+
+      try {
+        const raw = localStorage.getItem('pujasathi_custom_pujas');
+        const custom: Puja[] = raw ? JSON.parse(raw) : [];
+        const filtered = custom.filter((p) => p.id !== finalPuja.id && p.slug !== finalPuja.slug);
+        filtered.unshift(finalPuja);
+        localStorage.setItem('pujasathi_custom_pujas', JSON.stringify(filtered));
+      } catch (e) {
+        console.error(e);
+      }
+
       setActionSuccess(
         editingPuja
           ? 'Puja updated successfully!'
@@ -597,15 +623,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       if (editingPuja) {
         setPujasList((prev) =>
-          prev.map((p) => (p.id === editingPuja.id ? savedPuja || { ...p, ...payload } : p))
+          prev.map((p) => (p.id === editingPuja.id ? finalPuja : p))
         );
-      } else if (savedPuja) {
-        setPujasList((prev) => [savedPuja, ...prev]);
+      } else {
+        setPujasList((prev) => [finalPuja, ...prev]);
       }
 
       loadAdminData();
       onCatalogUpdated?.();
-      if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'puja', item: finalPuja } }));
+      }
     } catch (err: any) {
       setIsSavingPuja(false);
       setActionError(err.message || 'Error saving puja');
@@ -618,6 +646,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     try {
       const res = await safeFetchJson(`/api/admin/pujas/${puja.id}`, { method: 'DELETE' });
       if (res.ok) {
+        try {
+          const raw = localStorage.getItem('pujasathi_custom_pujas');
+          if (raw) {
+            const custom: Puja[] = JSON.parse(raw);
+            const filtered = custom.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
+            localStorage.setItem('pujasathi_custom_pujas', JSON.stringify(filtered));
+          }
+        } catch {}
         setActionSuccess(`Puja "${puja.name}" and any attached image deleted successfully.`);
         setTimeout(() => setActionSuccess(''), 4000);
         setPujasList((prev) => prev.filter((p) => p.id !== puja.id));
@@ -730,6 +766,29 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       }
 
       const savedProduct = res.data?.product;
+      const finalProduct: Product = savedProduct || {
+        id: editingProduct ? editingProduct.id : `prod_${Date.now()}`,
+        slug: editingProduct ? editingProduct.slug : `${productForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+        name: payload.name,
+        category: payload.category,
+        description: payload.description,
+        price_paise: payload.price_paise,
+        stock: payload.stock,
+        image: payload.image,
+        is_active: payload.is_active,
+        featured: payload.featured,
+      };
+
+      try {
+        const raw = localStorage.getItem('pujasathi_custom_products');
+        const custom: Product[] = raw ? JSON.parse(raw) : [];
+        const filtered = custom.filter((p) => p.id !== finalProduct.id && p.slug !== finalProduct.slug);
+        filtered.unshift(finalProduct);
+        localStorage.setItem('pujasathi_custom_products', JSON.stringify(filtered));
+      } catch (e) {
+        console.error(e);
+      }
+
       setActionSuccess(
         editingProduct
           ? 'Puja Essential updated!'
@@ -740,15 +799,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       if (editingProduct) {
         setProductsList((prev) =>
-          prev.map((p) => (p.id === editingProduct.id ? savedProduct || { ...p, ...payload } : p))
+          prev.map((p) => (p.id === editingProduct.id ? finalProduct : p))
         );
-      } else if (savedProduct) {
-        setProductsList((prev) => [savedProduct, ...prev]);
+      } else {
+        setProductsList((prev) => [finalProduct, ...prev]);
       }
 
       loadAdminData();
       onCatalogUpdated?.();
-      if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'product', item: finalProduct } }));
+      }
     } catch (err: any) {
       setIsSavingProduct(false);
       setActionError(err.message || 'Error saving product');
@@ -761,6 +822,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     try {
       const res = await safeFetchJson(`/api/admin/products/${prod.id}`, { method: 'DELETE' });
       if (res.ok) {
+        try {
+          const raw = localStorage.getItem('pujasathi_custom_products');
+          if (raw) {
+            const custom: Product[] = JSON.parse(raw);
+            const filtered = custom.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
+            localStorage.setItem('pujasathi_custom_products', JSON.stringify(filtered));
+          }
+        } catch {}
         setActionSuccess(`Essential item "${prod.name}" removed successfully.`);
         setTimeout(() => setActionSuccess(''), 4000);
         setProductsList((prev) => prev.filter((p) => p.id !== prod.id));
@@ -891,6 +960,33 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       }
 
       const savedPujari = res.data?.pujari;
+      const finalPujari: Pujari = savedPujari || {
+        id: editingPujari ? editingPujari.id : `pjr_${Date.now()}`,
+        slug: editingPujari ? editingPujari.slug : `${pujariForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+        name: payload.name,
+        photo: payload.photo,
+        bio: payload.bio,
+        experience_years: payload.experience_years,
+        specializations: payload.specializations,
+        languages: payload.languages,
+        service_areas: payload.service_areas,
+        phone: payload.phone,
+        email: payload.email,
+        is_active: payload.is_active,
+        rating: payload.rating,
+        review_count: payload.review_count,
+      };
+
+      try {
+        const raw = localStorage.getItem('pujasathi_custom_pujaris');
+        const custom: Pujari[] = raw ? JSON.parse(raw) : [];
+        const filtered = custom.filter((p) => p.id !== finalPujari.id && p.slug !== finalPujari.slug);
+        filtered.unshift(finalPujari);
+        localStorage.setItem('pujasathi_custom_pujaris', JSON.stringify(filtered));
+      } catch (e) {
+        console.error(e);
+      }
+
       setActionSuccess(
         editingPujari ? 'Acharya updated successfully!' : 'New Acharya added to directory!'
       );
@@ -899,15 +995,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       if (editingPujari) {
         setPujarisList((prev) =>
-          prev.map((p) => (p.id === editingPujari.id ? savedPujari || { ...p, ...payload } : p))
+          prev.map((p) => (p.id === editingPujari.id ? finalPujari : p))
         );
-      } else if (savedPujari) {
-        setPujarisList((prev) => [savedPujari, ...prev]);
+      } else {
+        setPujarisList((prev) => [finalPujari, ...prev]);
       }
 
       loadAdminData();
       onCatalogUpdated?.();
-      if (typeof window !== 'undefined') window.dispatchEvent(new Event('catalogUpdated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'pujari', item: finalPujari } }));
+      }
     } catch (err: any) {
       setIsSavingPujari(false);
       setActionError(err.message || 'Error saving acharya');
@@ -936,6 +1034,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     try {
       const res = await safeFetchJson(`/api/admin/pujaris/${pujari.id}`, { method: 'DELETE' });
       if (res.ok) {
+        try {
+          const raw = localStorage.getItem('pujasathi_custom_pujaris');
+          if (raw) {
+            const custom: Pujari[] = JSON.parse(raw);
+            const filtered = custom.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
+            localStorage.setItem('pujasathi_custom_pujaris', JSON.stringify(filtered));
+          }
+        } catch {}
         setActionSuccess(`Acharya "${pujari.name}" removed from directory.`);
         setTimeout(() => setActionSuccess(''), 4000);
         setPujarisList((prev) => prev.filter((p) => p.id !== pujari.id));

@@ -20,10 +20,12 @@ if (isVercel) {
 
 export const db = new DatabaseSync(dbPath);
 
-// Enable WAL mode and foreign keys for high performance & ACID concurrency
+// Direct atomic commits and concurrency timeout for rock-solid persistence
 db.exec(`
-  PRAGMA journal_mode = WAL;
+  PRAGMA journal_mode = DELETE;
   PRAGMA foreign_keys = ON;
+  PRAGMA busy_timeout = 5000;
+  PRAGMA synchronous = NORMAL;
 `);
 
 export function initDatabase() {
