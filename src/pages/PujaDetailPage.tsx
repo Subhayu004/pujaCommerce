@@ -24,15 +24,16 @@ export const PujaDetailPage: React.FC<PujaDetailPageProps> = ({
       setPuja(initialPuja);
       setIsLoading(false);
     } else if (slug) {
-      // Check local cache first
+      // Quick check in server cache for instant rendering
       try {
-        const rawCustom = localStorage.getItem('pujasathi_custom_pujas');
         const rawCached = localStorage.getItem('pujasathi_cached_pujas');
-        const all = [...(rawCustom ? JSON.parse(rawCustom) : []), ...(rawCached ? JSON.parse(rawCached) : [])];
-        const found = all.find((p) => p.slug === slug || p.id === slug);
-        if (found) {
-          setPuja(found);
-          setIsLoading(false);
+        if (rawCached) {
+          const list = JSON.parse(rawCached);
+          const found = list.find((p: any) => p.slug === slug || p.id === slug);
+          if (found) {
+            setPuja(found);
+            setIsLoading(false);
+          }
         }
       } catch {}
 

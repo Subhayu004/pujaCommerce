@@ -88,16 +88,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [pujasList, setPujasList] = useState<Puja[]>(() => {
     try {
       const cached = localStorage.getItem('pujasathi_cached_pujas');
-      const custom = localStorage.getItem('pujasathi_custom_pujas');
-      const base: Puja[] = cached ? JSON.parse(cached) : [];
-      const extra: Puja[] = custom ? JSON.parse(custom) : [];
-      const merged = [...base];
-      for (const item of extra) {
-        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
-        if (idx >= 0) merged[idx] = item;
-        else merged.unshift(item);
-      }
-      return merged;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -106,16 +97,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [productsList, setProductsList] = useState<Product[]>(() => {
     try {
       const cached = localStorage.getItem('pujasathi_cached_products');
-      const custom = localStorage.getItem('pujasathi_custom_products');
-      const base: Product[] = cached ? JSON.parse(cached) : [];
-      const extra: Product[] = custom ? JSON.parse(custom) : [];
-      const merged = [...base];
-      for (const item of extra) {
-        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
-        if (idx >= 0) merged[idx] = item;
-        else merged.unshift(item);
-      }
-      return merged;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -124,16 +106,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [pujarisList, setPujarisList] = useState<Pujari[]>(() => {
     try {
       const cached = localStorage.getItem('pujasathi_cached_pujaris');
-      const custom = localStorage.getItem('pujasathi_custom_pujaris');
-      const base: Pujari[] = cached ? JSON.parse(cached) : [];
-      const extra: Pujari[] = custom ? JSON.parse(custom) : [];
-      const merged = [...base];
-      for (const item of extra) {
-        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
-        if (idx >= 0) merged[idx] = item;
-        else merged.unshift(item);
-      }
-      return merged;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -371,110 +344,38 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         setBookingsList(bRes.data.bookings || []);
       }
 
-      // 3. Pujas catalog
+      // 3. Pujas catalog (universal server DB)
       const puCatalogRes = await safeFetchJson('/api/admin/pujas');
-      let basePujas: Puja[] = [];
       if (puCatalogRes.ok && puCatalogRes.data?.pujas) {
-        basePujas = puCatalogRes.data.pujas || [];
+        setPujasList(puCatalogRes.data.pujas);
       } else {
         const puFallback = await safeFetchJson('/api/pujas');
         if (puFallback.ok && puFallback.data?.pujas) {
-          basePujas = puFallback.data.pujas || [];
+          setPujasList(puFallback.data.pujas);
         }
       }
 
-      let customPujas: Puja[] = [];
-      try {
-        const raw = localStorage.getItem('pujasathi_custom_pujas');
-        if (raw) customPujas = JSON.parse(raw);
-      } catch {}
-
-      let deletedPujas: string[] = [];
-      try {
-        const rawDel = localStorage.getItem('pujasathi_deleted_pujas');
-        if (rawDel) deletedPujas = JSON.parse(rawDel);
-      } catch {}
-
-      const mergedPujas = [...basePujas];
-      for (const cp of customPujas) {
-        const idx = mergedPujas.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
-        if (idx >= 0) {
-          mergedPujas[idx] = cp;
-        } else {
-          mergedPujas.unshift(cp);
-        }
-      }
-      setPujasList(mergedPujas.filter((p) => !deletedPujas.includes(p.id) && !deletedPujas.includes(p.slug)));
-
-      // 4. Products catalog
+      // 4. Products catalog (universal server DB)
       const pRes = await safeFetchJson('/api/admin/products');
-      let baseProducts: Product[] = [];
       if (pRes.ok && pRes.data?.products) {
-        baseProducts = pRes.data.products || [];
+        setProductsList(pRes.data.products);
       } else {
         const pFallback = await safeFetchJson('/api/products');
         if (pFallback.ok && pFallback.data?.products) {
-          baseProducts = pFallback.data.products || [];
+          setProductsList(pFallback.data.products);
         }
       }
 
-      let customProducts: Product[] = [];
-      try {
-        const raw = localStorage.getItem('pujasathi_custom_products');
-        if (raw) customProducts = JSON.parse(raw);
-      } catch {}
-
-      let deletedProducts: string[] = [];
-      try {
-        const rawDel = localStorage.getItem('pujasathi_deleted_products');
-        if (rawDel) deletedProducts = JSON.parse(rawDel);
-      } catch {}
-
-      const mergedProducts = [...baseProducts];
-      for (const cp of customProducts) {
-        const idx = mergedProducts.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
-        if (idx >= 0) {
-          mergedProducts[idx] = cp;
-        } else {
-          mergedProducts.unshift(cp);
-        }
-      }
-      setProductsList(mergedProducts.filter((p) => !deletedProducts.includes(p.id) && !deletedProducts.includes(p.slug)));
-
-      // 5. Pujaris
+      // 5. Pujaris (universal server DB)
       const puRes = await safeFetchJson('/api/admin/pujaris');
-      let basePujaris: Pujari[] = [];
       if (puRes.ok && puRes.data?.pujaris) {
-        basePujaris = puRes.data.pujaris || [];
+        setPujarisList(puRes.data.pujaris);
       } else {
         const puFallback = await safeFetchJson('/api/pujaris');
         if (puFallback.ok && puFallback.data?.pujaris) {
-          basePujaris = puFallback.data.pujaris || [];
+          setPujarisList(puFallback.data.pujaris);
         }
       }
-
-      let customPujaris: Pujari[] = [];
-      try {
-        const raw = localStorage.getItem('pujasathi_custom_pujaris');
-        if (raw) customPujaris = JSON.parse(raw);
-      } catch {}
-
-      let deletedPujaris: string[] = [];
-      try {
-        const rawDel = localStorage.getItem('pujasathi_deleted_pujaris');
-        if (rawDel) deletedPujaris = JSON.parse(rawDel);
-      } catch {}
-
-      const mergedPujaris = [...basePujaris];
-      for (const cp of customPujaris) {
-        const idx = mergedPujaris.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
-        if (idx >= 0) {
-          mergedPujaris[idx] = cp;
-        } else {
-          mergedPujaris.unshift(cp);
-        }
-      }
-      setPujarisList(mergedPujaris.filter((p) => !deletedPujaris.includes(p.id) && !deletedPujaris.includes(p.slug)));
 
       // 6. Audit Logs
       const aRes = await safeFetchJson('/api/admin/audit-logs');
@@ -491,6 +392,39 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   useEffect(() => {
     if (user?.role === 'admin') {
       loadAdminData();
+
+      // Keep admin dashboard live with customer orders and catalog changes across all devices
+      const interval = setInterval(() => {
+        loadAdminData();
+      }, 3500);
+
+      const handleFocus = () => {
+        loadAdminData();
+      };
+
+      let bc: BroadcastChannel | null = null;
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          bc = new BroadcastChannel('pujasathi_catalog_channel');
+          bc.onmessage = () => {
+            loadAdminData();
+          };
+        }
+      } catch {}
+
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('visibilitychange', handleFocus);
+
+      return () => {
+        clearInterval(interval);
+        if (bc) {
+          try {
+            bc.close();
+          } catch {}
+        }
+        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('visibilitychange', handleFocus);
+      };
     }
   }, [user, statusFilter, paymentFilter, searchBooking]);
 
@@ -703,58 +637,34 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setIsSavingPuja(false);
 
       if (!res.ok) {
-        setActionError(res.data?.error || 'Failed to save puja');
+        setActionError(res.data?.error || 'Failed to save puja on server');
         setTimeout(() => setActionError(''), 4000);
         return;
       }
 
-      const savedPuja = res.data?.puja;
-      const finalPuja: Puja = savedPuja || {
-        id: editingPuja ? editingPuja.id : `puj_${Date.now()}`,
-        slug: editingPuja ? editingPuja.slug : `${pujaForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-        name: payload.name,
-        deity: payload.deity,
-        short_description: payload.short_description,
-        description: payload.description,
-        price_paise: payload.price_paise,
-        duration_mins: payload.duration_mins,
-        image: payload.image,
-        required_materials: payload.required_materials,
-        booking_requirements: payload.booking_requirements,
-        is_active: payload.is_active,
-        featured: payload.featured,
-      };
-
-      try {
-        const raw = localStorage.getItem('pujasathi_custom_pujas');
-        const custom: Puja[] = raw ? JSON.parse(raw) : [];
-        const filtered = custom.filter((p) => p.id !== finalPuja.id && p.slug !== finalPuja.slug);
-        filtered.unshift(finalPuja);
-        localStorage.setItem('pujasathi_custom_pujas', JSON.stringify(filtered));
-      } catch (e) {
-        console.error(e);
+      const savedPuja: Puja = res.data?.puja;
+      if (savedPuja) {
+        if (editingPuja) {
+          setPujasList((prev) =>
+            prev.map((p) => (p.id === editingPuja.id ? savedPuja : p))
+          );
+        } else {
+          setPujasList((prev) => [savedPuja, ...prev]);
+        }
       }
 
       setActionSuccess(
         editingPuja
-          ? 'Puja updated successfully!'
-          : 'New Puja created and added to Vedic Puja Rituals Catalog & customer portal!'
+          ? 'Puja ritual updated successfully on server!'
+          : 'New Puja ritual created and saved to universal catalog!'
       );
       setTimeout(() => setActionSuccess(''), 4000);
       setPujaModalOpen(false);
 
-      if (editingPuja) {
-        setPujasList((prev) =>
-          prev.map((p) => (p.id === editingPuja.id ? finalPuja : p))
-        );
-      } else {
-        setPujasList((prev) => [finalPuja, ...prev]);
-      }
-
       loadAdminData();
       onCatalogUpdated?.();
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'puja', item: finalPuja } }));
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'puja', item: savedPuja } }));
       }
     } catch (err: any) {
       setIsSavingPuja(false);
@@ -766,34 +676,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const confirmDeletePuja = async (puja: Puja) => {
     setIsDeletingPuja(true);
     try {
-      try {
-        const rawCustom = localStorage.getItem('pujasathi_custom_pujas');
-        if (rawCustom) {
-          const custom: Puja[] = JSON.parse(rawCustom);
-          const filtered = custom.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
-          localStorage.setItem('pujasathi_custom_pujas', JSON.stringify(filtered));
-        }
-
-        const rawCached = localStorage.getItem('pujasathi_cached_pujas');
-        if (rawCached) {
-          const cached: Puja[] = JSON.parse(rawCached);
-          const filtered = cached.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
-          localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(filtered));
-        }
-
-        const rawDeleted = localStorage.getItem('pujasathi_deleted_pujas');
-        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
-        if (!deletedList.includes(puja.id)) deletedList.push(puja.id);
-        if (puja.slug && !deletedList.includes(puja.slug)) deletedList.push(puja.slug);
-        localStorage.setItem('pujasathi_deleted_pujas', JSON.stringify(deletedList));
-      } catch (e) {
-        console.error(e);
+      const res = await safeFetchJson(`/api/admin/pujas/${puja.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setActionError(res.data?.error || `Failed to delete puja "${puja.name}" from server`);
+        setTimeout(() => setActionError(''), 4000);
+        return;
       }
 
       setPujasList((prev) => prev.filter((p) => p.id !== puja.id && p.slug !== puja.slug));
-      setActionSuccess(`Puja "${puja.name}" deleted successfully.`);
+      setActionSuccess(`Puja "${puja.name}" deleted successfully from universal database.`);
       setTimeout(() => setActionSuccess(''), 4000);
 
+      onCatalogUpdated?.();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('catalogUpdated', {
@@ -801,11 +695,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           })
         );
       }
-      onCatalogUpdated?.();
-
-      await safeFetchJson(`/api/admin/pujas/${puja.id}`, { method: 'DELETE' });
     } catch (err: any) {
       console.error(err);
+      setActionError(err.message || 'Error deleting puja');
+      setTimeout(() => setActionError(''), 4000);
     } finally {
       setIsDeletingPuja(false);
       setPujaToDelete(null);
@@ -898,55 +791,34 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setIsSavingProduct(false);
 
       if (!res.ok) {
-        setActionError(res.data?.error || 'Failed to save product');
+        setActionError(res.data?.error || 'Failed to save product on server');
         setTimeout(() => setActionError(''), 4000);
         return;
       }
 
-      const savedProduct = res.data?.product;
-      const finalProduct: Product = savedProduct || {
-        id: editingProduct ? editingProduct.id : `prod_${Date.now()}`,
-        slug: editingProduct ? editingProduct.slug : `${productForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-        name: payload.name,
-        category: payload.category,
-        description: payload.description,
-        price_paise: payload.price_paise,
-        stock: payload.stock,
-        image: payload.image,
-        is_active: payload.is_active,
-        featured: payload.featured,
-      };
-
-      try {
-        const raw = localStorage.getItem('pujasathi_custom_products');
-        const custom: Product[] = raw ? JSON.parse(raw) : [];
-        const filtered = custom.filter((p) => p.id !== finalProduct.id && p.slug !== finalProduct.slug);
-        filtered.unshift(finalProduct);
-        localStorage.setItem('pujasathi_custom_products', JSON.stringify(filtered));
-      } catch (e) {
-        console.error(e);
+      const savedProduct: Product = res.data?.product;
+      if (savedProduct) {
+        if (editingProduct) {
+          setProductsList((prev) =>
+            prev.map((p) => (p.id === editingProduct.id ? savedProduct : p))
+          );
+        } else {
+          setProductsList((prev) => [savedProduct, ...prev]);
+        }
       }
 
       setActionSuccess(
         editingProduct
-          ? 'Puja Essential updated!'
-          : 'New Puja Essential created and added to inventory & store catalog!'
+          ? 'Puja Essential item updated on server!'
+          : 'New Puja Essential created and added to universal inventory!'
       );
       setTimeout(() => setActionSuccess(''), 4000);
       setProductModalOpen(false);
 
-      if (editingProduct) {
-        setProductsList((prev) =>
-          prev.map((p) => (p.id === editingProduct.id ? finalProduct : p))
-        );
-      } else {
-        setProductsList((prev) => [finalProduct, ...prev]);
-      }
-
       loadAdminData();
       onCatalogUpdated?.();
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'product', item: finalProduct } }));
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'product', item: savedProduct } }));
       }
     } catch (err: any) {
       setIsSavingProduct(false);
@@ -958,34 +830,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const confirmDeleteProduct = async (prod: Product) => {
     setIsDeletingProduct(true);
     try {
-      try {
-        const rawCustom = localStorage.getItem('pujasathi_custom_products');
-        if (rawCustom) {
-          const custom: Product[] = JSON.parse(rawCustom);
-          const filtered = custom.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
-          localStorage.setItem('pujasathi_custom_products', JSON.stringify(filtered));
-        }
-
-        const rawCached = localStorage.getItem('pujasathi_cached_products');
-        if (rawCached) {
-          const cached: Product[] = JSON.parse(rawCached);
-          const filtered = cached.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
-          localStorage.setItem('pujasathi_cached_products', JSON.stringify(filtered));
-        }
-
-        const rawDeleted = localStorage.getItem('pujasathi_deleted_products');
-        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
-        if (!deletedList.includes(prod.id)) deletedList.push(prod.id);
-        if (prod.slug && !deletedList.includes(prod.slug)) deletedList.push(prod.slug);
-        localStorage.setItem('pujasathi_deleted_products', JSON.stringify(deletedList));
-      } catch (e) {
-        console.error(e);
+      const res = await safeFetchJson(`/api/admin/products/${prod.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setActionError(res.data?.error || `Failed to delete product "${prod.name}" from server`);
+        setTimeout(() => setActionError(''), 4000);
+        return;
       }
 
       setProductsList((prev) => prev.filter((p) => p.id !== prod.id && p.slug !== prod.slug));
-      setActionSuccess(`Essential item "${prod.name}" removed successfully.`);
+      setActionSuccess(`Essential item "${prod.name}" removed successfully from universal inventory.`);
       setTimeout(() => setActionSuccess(''), 4000);
 
+      onCatalogUpdated?.();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('catalogUpdated', {
@@ -993,11 +849,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           })
         );
       }
-      onCatalogUpdated?.();
-
-      await safeFetchJson(`/api/admin/products/${prod.id}`, { method: 'DELETE' });
     } catch (err: any) {
       console.error(err);
+      setActionError(err.message || 'Error deleting product');
+      setTimeout(() => setActionError(''), 4000);
     } finally {
       setIsDeletingProduct(false);
       setProductToDelete(null);
@@ -1108,57 +963,32 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setIsSavingPujari(false);
 
       if (!res.ok) {
-        setActionError(res.data?.error || 'Failed to save acharya');
+        setActionError(res.data?.error || 'Failed to save acharya on server');
         setTimeout(() => setActionError(''), 4000);
         return;
       }
 
-      const savedPujari = res.data?.pujari;
-      const finalPujari: Pujari = savedPujari || {
-        id: editingPujari ? editingPujari.id : `pjr_${Date.now()}`,
-        slug: editingPujari ? editingPujari.slug : `${pujariForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-        name: payload.name,
-        photo: payload.photo,
-        bio: payload.bio,
-        experience_years: payload.experience_years,
-        specializations: payload.specializations,
-        languages: payload.languages,
-        service_areas: payload.service_areas,
-        phone: payload.phone,
-        email: payload.email,
-        is_active: payload.is_active,
-        rating: payload.rating,
-        review_count: payload.review_count,
-      };
-
-      try {
-        const raw = localStorage.getItem('pujasathi_custom_pujaris');
-        const custom: Pujari[] = raw ? JSON.parse(raw) : [];
-        const filtered = custom.filter((p) => p.id !== finalPujari.id && p.slug !== finalPujari.slug);
-        filtered.unshift(finalPujari);
-        localStorage.setItem('pujasathi_custom_pujaris', JSON.stringify(filtered));
-      } catch (e) {
-        console.error(e);
+      const savedPujari: Pujari = res.data?.pujari;
+      if (savedPujari) {
+        if (editingPujari) {
+          setPujarisList((prev) =>
+            prev.map((p) => (p.id === editingPujari.id ? savedPujari : p))
+          );
+        } else {
+          setPujarisList((prev) => [savedPujari, ...prev]);
+        }
       }
 
       setActionSuccess(
-        editingPujari ? 'Acharya updated successfully!' : 'New Acharya added to directory!'
+        editingPujari ? 'Acharya updated successfully on server!' : 'New Acharya added to universal directory!'
       );
       setTimeout(() => setActionSuccess(''), 4000);
       setPujariModalOpen(false);
 
-      if (editingPujari) {
-        setPujarisList((prev) =>
-          prev.map((p) => (p.id === editingPujari.id ? finalPujari : p))
-        );
-      } else {
-        setPujarisList((prev) => [finalPujari, ...prev]);
-      }
-
       loadAdminData();
       onCatalogUpdated?.();
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'pujari', item: finalPujari } }));
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'pujari', item: savedPujari } }));
       }
     } catch (err: any) {
       setIsSavingPujari(false);
@@ -1186,34 +1016,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const confirmDeletePujari = async (pujari: Pujari) => {
     setIsDeletingPujari(true);
     try {
-      try {
-        const rawCustom = localStorage.getItem('pujasathi_custom_pujaris');
-        if (rawCustom) {
-          const custom: Pujari[] = JSON.parse(rawCustom);
-          const filtered = custom.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
-          localStorage.setItem('pujasathi_custom_pujaris', JSON.stringify(filtered));
-        }
-
-        const rawCached = localStorage.getItem('pujasathi_cached_pujaris');
-        if (rawCached) {
-          const cached: Pujari[] = JSON.parse(rawCached);
-          const filtered = cached.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
-          localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(filtered));
-        }
-
-        const rawDeleted = localStorage.getItem('pujasathi_deleted_pujaris');
-        const deletedList: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
-        if (!deletedList.includes(pujari.id)) deletedList.push(pujari.id);
-        if (pujari.slug && !deletedList.includes(pujari.slug)) deletedList.push(pujari.slug);
-        localStorage.setItem('pujasathi_deleted_pujaris', JSON.stringify(deletedList));
-      } catch (e) {
-        console.error(e);
+      const res = await safeFetchJson(`/api/admin/pujaris/${pujari.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setActionError(res.data?.error || `Failed to delete acharya "${pujari.name}" from server`);
+        setTimeout(() => setActionError(''), 4000);
+        return;
       }
 
       setPujarisList((prev) => prev.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug));
-      setActionSuccess(`Acharya "${pujari.name}" removed from directory.`);
+      setActionSuccess(`Acharya "${pujari.name}" removed successfully from universal directory.`);
       setTimeout(() => setActionSuccess(''), 4000);
 
+      onCatalogUpdated?.();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('catalogUpdated', {
@@ -1221,11 +1035,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           })
         );
       }
-      onCatalogUpdated?.();
-
-      await safeFetchJson(`/api/admin/pujaris/${pujari.id}`, { method: 'DELETE' });
     } catch (err: any) {
       console.error(err);
+      setActionError(err.message || 'Error deleting acharya');
+      setTimeout(() => setActionError(''), 4000);
     } finally {
       setIsDeletingPujari(false);
       setPujariToDelete(null);

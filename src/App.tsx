@@ -28,20 +28,23 @@ export function AppContent() {
     return window.location.pathname || '/';
   });
 
-  // Initialize from cache and custom items for instant render
+  // Clean up any legacy localStorage override items so all devices are 100% in sync with the server database
+  useEffect(() => {
+    try {
+      localStorage.removeItem('pujasathi_custom_pujas');
+      localStorage.removeItem('pujasathi_deleted_pujas');
+      localStorage.removeItem('pujasathi_custom_products');
+      localStorage.removeItem('pujasathi_deleted_products');
+      localStorage.removeItem('pujasathi_custom_pujaris');
+      localStorage.removeItem('pujasathi_deleted_pujaris');
+    } catch {}
+  }, []);
+
+  // Initialize from server cache for fast initial render
   const [pujas, setPujas] = useState<Puja[]>(() => {
     try {
       const cached = localStorage.getItem('pujasathi_cached_pujas');
-      const custom = localStorage.getItem('pujasathi_custom_pujas');
-      const base: Puja[] = cached ? JSON.parse(cached) : [];
-      const extra: Puja[] = custom ? JSON.parse(custom) : [];
-      const merged = [...base];
-      for (const item of extra) {
-        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
-        if (idx >= 0) merged[idx] = item;
-        else merged.unshift(item);
-      }
-      return merged;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -50,16 +53,7 @@ export function AppContent() {
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const cached = localStorage.getItem('pujasathi_cached_products');
-      const custom = localStorage.getItem('pujasathi_custom_products');
-      const base: Product[] = cached ? JSON.parse(cached) : [];
-      const extra: Product[] = custom ? JSON.parse(custom) : [];
-      const merged = [...base];
-      for (const item of extra) {
-        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
-        if (idx >= 0) merged[idx] = item;
-        else merged.unshift(item);
-      }
-      return merged;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -68,16 +62,7 @@ export function AppContent() {
   const [pujaris, setPujaris] = useState<Pujari[]>(() => {
     try {
       const cached = localStorage.getItem('pujasathi_cached_pujaris');
-      const custom = localStorage.getItem('pujasathi_custom_pujaris');
-      const base: Pujari[] = cached ? JSON.parse(cached) : [];
-      const extra: Pujari[] = custom ? JSON.parse(custom) : [];
-      const merged = [...base];
-      for (const item of extra) {
-        const idx = merged.findIndex((p) => p.id === item.id || p.slug === item.slug);
-        if (idx >= 0) merged[idx] = item;
-        else merged.unshift(item);
-      }
-      return merged;
+      return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
     }
@@ -103,107 +88,67 @@ export function AppContent() {
     }
   };
 
-  // Re-fetch catalog data and seamlessly blend custom items
+  // Re-fetch catalog data directly from server database (universal across all devices)
   const refreshCatalog = () => {
     fetch('/api/pujas', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.pujas && Array.isArray(data.pujas)) {
-          let customPujas: Puja[] = [];
+          setPujas(data.pujas);
           try {
-            const raw = localStorage.getItem('pujasathi_custom_pujas');
-            if (raw) customPujas = JSON.parse(raw);
-          } catch {}
-
-          let deletedPujas: string[] = [];
-          try {
-            const rawDel = localStorage.getItem('pujasathi_deleted_pujas');
-            if (rawDel) deletedPujas = JSON.parse(rawDel);
-          } catch {}
-
-          const combined = [...data.pujas];
-          for (const cp of customPujas) {
-            const idx = combined.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
-            if (idx >= 0) combined[idx] = cp;
-            else combined.unshift(cp);
-          }
-
-          const filtered = combined.filter((p) => !deletedPujas.includes(p.id) && !deletedPujas.includes(p.slug));
-          setPujas(filtered);
-          try {
-            localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(filtered));
+            localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(data.pujas));
           } catch {}
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => console.error('Error fetching pujas:', err));
 
     fetch('/api/products', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.products && Array.isArray(data.products)) {
-          let customProducts: Product[] = [];
+          setProducts(data.products);
           try {
-            const raw = localStorage.getItem('pujasathi_custom_products');
-            if (raw) customProducts = JSON.parse(raw);
-          } catch {}
-
-          let deletedProducts: string[] = [];
-          try {
-            const rawDel = localStorage.getItem('pujasathi_deleted_products');
-            if (rawDel) deletedProducts = JSON.parse(rawDel);
-          } catch {}
-
-          const combined = [...data.products];
-          for (const cp of customProducts) {
-            const idx = combined.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
-            if (idx >= 0) combined[idx] = cp;
-            else combined.unshift(cp);
-          }
-
-          const filtered = combined.filter((p) => !deletedProducts.includes(p.id) && !deletedProducts.includes(p.slug));
-          setProducts(filtered);
-          try {
-            localStorage.setItem('pujasathi_cached_products', JSON.stringify(filtered));
+            localStorage.setItem('pujasathi_cached_products', JSON.stringify(data.products));
           } catch {}
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => console.error('Error fetching products:', err));
 
     fetch('/api/pujaris', { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.pujaris && Array.isArray(data.pujaris)) {
-          let customPujaris: Pujari[] = [];
+          setPujaris(data.pujaris);
           try {
-            const raw = localStorage.getItem('pujasathi_custom_pujaris');
-            if (raw) customPujaris = JSON.parse(raw);
-          } catch {}
-
-          let deletedPujaris: string[] = [];
-          try {
-            const rawDel = localStorage.getItem('pujasathi_deleted_pujaris');
-            if (rawDel) deletedPujaris = JSON.parse(rawDel);
-          } catch {}
-
-          const combined = [...data.pujaris];
-          for (const cp of customPujaris) {
-            const idx = combined.findIndex((p) => p.id === cp.id || p.slug === cp.slug);
-            if (idx >= 0) combined[idx] = cp;
-            else combined.unshift(cp);
-          }
-
-          const filtered = combined.filter((p) => !deletedPujaris.includes(p.id) && !deletedPujaris.includes(p.slug));
-          setPujaris(filtered);
-          try {
-            localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(filtered));
+            localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(data.pujaris));
           } catch {}
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => console.error('Error fetching pujaris:', err));
   };
 
   useEffect(() => {
     refreshCatalog();
+
+    // Re-fetch when switching tabs, waking device, or window gets focus (seamless cross-device sync)
+    const handleFocus = () => {
+      refreshCatalog();
+    };
+
+    // Auto-polling every 3.5s to keep all devices automatically in sync with server changes
+    const interval = setInterval(refreshCatalog, 3500);
+
+    // Cross-tab / cross-window instant notification channel
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('pujasathi_catalog_channel');
+        bc.onmessage = () => {
+          refreshCatalog();
+        };
+      }
+    } catch {}
+
     const handleCatalogUpdate = (e?: any) => {
       if (e?.detail) {
         if (e.detail.type === 'puja' && e.detail.item) {
@@ -250,10 +195,26 @@ export function AppContent() {
         }
       }
       refreshCatalog();
+      try {
+        bc?.postMessage('catalog_updated');
+      } catch {}
     };
 
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
     window.addEventListener('catalogUpdated', handleCatalogUpdate);
-    return () => window.removeEventListener('catalogUpdated', handleCatalogUpdate);
+
+    return () => {
+      clearInterval(interval);
+      if (bc) {
+        try {
+          bc.close();
+        } catch {}
+      }
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+      window.removeEventListener('catalogUpdated', handleCatalogUpdate);
+    };
   }, [currentRoute]);
 
   // Booking initiation: requires devotee authentication to book a puja
@@ -291,7 +252,7 @@ export function AppContent() {
     // 3. Puja Detail
     if (currentRoute.startsWith('/book-puja/')) {
       const slug = currentRoute.replace('/book-puja/', '');
-      const singlePuja = pujas.find((p) => p.slug === slug) || null;
+      const singlePuja = pujas.find((p) => p.slug === slug || p.id === slug) || null;
       return (
         <PujaDetailPage
           slug={slug}
@@ -305,7 +266,7 @@ export function AppContent() {
     // 4. Product Detail
     if (currentRoute.startsWith('/puja-shop/')) {
       const slug = currentRoute.replace('/puja-shop/', '');
-      const singleProduct = products.find((p) => p.slug === slug) || null;
+      const singleProduct = products.find((p) => p.slug === slug || p.id === slug) || null;
       return <ProductDetailPage slug={slug} product={singleProduct} onNavigate={navigate} />;
     }
 

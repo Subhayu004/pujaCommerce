@@ -9,7 +9,7 @@ interface AccountPageProps {
 }
 
 export const AccountPage: React.FC<AccountPageProps> = ({ onNavigate, onOpenAuth }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, getAuthHeaders } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [activeTab, setActiveTab] = useState<'bookings' | 'all_orders' | 'profile'>('bookings');
@@ -17,7 +17,10 @@ export const AccountPage: React.FC<AccountPageProps> = ({ onNavigate, onOpenAuth
   useEffect(() => {
     if (user) {
       setLoadingOrders(true);
-      fetch('/api/orders/my-orders')
+      fetch('/api/orders/my-orders', {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data.orders) setOrders(data.orders);
