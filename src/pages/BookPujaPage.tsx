@@ -9,7 +9,7 @@ interface BookPujaPageProps {
   onNavigate: (route: string) => void;
 }
 
-const DEITY_FILTERS = [
+const DEFAULT_DEITY_FILTERS = [
   { id: 'all', label: 'All Deities' },
   { id: 'Shiva', label: 'Lord Shiva' },
   { id: 'Vishnu', label: 'Lord Vishnu' },
@@ -27,24 +27,41 @@ export const BookPujaPage: React.FC<BookPujaPageProps> = ({
   const [selectedDeity, setSelectedDeity] = useState('all');
   const [sortBy, setSortBy] = useState('featured');
 
+  const deityFilters = useMemo(() => {
+    const list = [...DEFAULT_DEITY_FILTERS];
+    (pujas || []).forEach((p) => {
+      const pDeity = (p.deity || '').trim();
+      if (pDeity && !list.some((f) => f.label.toLowerCase().includes(pDeity.toLowerCase()) || pDeity.toLowerCase().includes(f.id.toLowerCase()))) {
+        list.push({ id: pDeity, label: pDeity });
+      }
+    });
+    return list;
+  }, [pujas]);
+
   const filteredPujas = useMemo(() => {
-    return pujas
+    return (pujas || [])
       .filter((puja) => {
+        const pName = (puja.name || '').toLowerCase();
+        const pDesc = (puja.description || puja.short_description || '').toLowerCase();
+        const pDeity = (puja.deity || '').toLowerCase();
+        const q = (search || '').toLowerCase();
+
         const matchesSearch =
-          puja.name.toLowerCase().includes(search.toLowerCase()) ||
-          puja.description.toLowerCase().includes(search.toLowerCase()) ||
-          puja.deity.toLowerCase().includes(search.toLowerCase());
+          pName.includes(q) ||
+          pDesc.includes(q) ||
+          pDeity.includes(q);
 
         const matchesDeity =
-          selectedDeity === 'all' || puja.deity.toLowerCase().includes(selectedDeity.toLowerCase());
+          selectedDeity === 'all' || pDeity.includes(selectedDeity.toLowerCase());
 
         return matchesSearch && matchesDeity;
       })
       .sort((a, b) => {
-        if (sortBy === 'price_asc') return a.price_paise - b.price_paise;
-        if (sortBy === 'price_desc') return b.price_paise - a.price_paise;
-        if (sortBy === 'duration') return a.duration_mins - b.duration_mins;
-        return b.featured - a.featured;
+        if (sortBy === 'price_asc') return (a.price_paise || 0) - (b.price_paise || 0);
+        if (sortBy === 'price_desc') return (b.price_paise || 0) - (a.price_paise || 0);
+        if (sortBy === 'duration') return (a.duration_mins || 0) - (b.duration_mins || 0);
+        if ((b.featured || 0) !== (a.featured || 0)) return (b.featured || 0) - (a.featured || 0);
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
   }, [pujas, search, selectedDeity, sortBy]);
 
@@ -96,7 +113,7 @@ export const BookPujaPage: React.FC<BookPujaPageProps> = ({
 
         {/* Deity Filter Segmented Controls */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs scrollbar-thin">
-          {DEITY_FILTERS.map((f) => {
+          {deityFilters.map((f) => {
             const isSelected = selectedDeity === f.id;
             return (
               <button

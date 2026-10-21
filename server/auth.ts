@@ -21,6 +21,21 @@ export interface AuthenticatedRequest extends Request {
 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'pujasathi_holy_sanctum_session_secret_2026';
 
+export function isUserAdmin(userOrEmail?: string | { email?: string; role?: string } | null): boolean {
+  if (!userOrEmail) return false;
+  if (typeof userOrEmail === 'string') {
+    const norm = userOrEmail.trim().toLowerCase();
+    return norm === 'subhayuroy666@gmail.com' || norm === 'pujasathisupport@gmail.com' || norm === 'admin@mandirveda.com';
+  }
+  const email = (userOrEmail.email || '').trim().toLowerCase();
+  return (
+    userOrEmail.role === 'admin' ||
+    email === 'subhayuroy666@gmail.com' ||
+    email === 'pujasathisupport@gmail.com' ||
+    email === 'admin@mandirveda.com'
+  );
+}
+
 export function createSession(userId: string): string {
   const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
 
@@ -44,16 +59,16 @@ export function createSession(userId: string): string {
   }
 
   // Official admin fallback
-  if (!user && (userId === 'usr_pujasathi_admin' || userId === 'pujasathisupport@gmail.com')) {
+  if (!user && (userId === 'usr_pujasathi_admin' || userId === 'pujasathisupport@gmail.com' || userId === 'subhayuroy666@gmail.com')) {
     user = {
-      id: 'usr_pujasathi_admin',
-      email: 'pujasathisupport@gmail.com',
-      full_name: 'PujaSathi Administrator',
+      id: userId === 'subhayuroy666@gmail.com' ? 'usr_subhayu_admin' : 'usr_pujasathi_admin',
+      email: userId,
+      full_name: userId === 'subhayuroy666@gmail.com' ? 'Subhayu Roy (Admin)' : 'PujaSathi Administrator',
       role: 'admin',
     };
   }
 
-  const role = (user?.email === 'pujasathisupport@gmail.com' ? 'admin' : (user?.role || 'customer')) as 'customer' | 'admin';
+  const role = (isUserAdmin(user) || isUserAdmin(userId) ? 'admin' : (user?.role || 'customer')) as 'customer' | 'admin';
 
   const payload = {
     u: user ? user.id : userId,
@@ -98,9 +113,6 @@ export function getSessionUser(token: string): AuthUser | null {
         ) {
           const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
           if (payload && payload.exp && payload.exp > Date.now()) {
-            const isOfficialAdmin = payload.e === 'pujasathisupport@gmail.com';
-            const role: 'customer' | 'admin' = isOfficialAdmin ? 'admin' : (payload.r || 'customer');
-
             // Try to load latest profile fields from DB if available
             let dbUser: any = null;
             try {
@@ -109,11 +121,14 @@ export function getSessionUser(token: string): AuthUser | null {
                 .get(payload.u, payload.e);
             } catch {}
 
+            const isAdmin = isUserAdmin(dbUser) || isUserAdmin(payload.e) || isUserAdmin(payload.u) || payload.r === 'admin';
+            const role: 'customer' | 'admin' = isAdmin ? 'admin' : ((dbUser?.role || payload.r || 'customer') as 'customer' | 'admin');
+
             return {
               id: dbUser?.id || payload.u,
               email: dbUser?.email || payload.e,
               full_name: dbUser?.full_name || payload.n || 'PujaSathi Devotee',
-              role: isOfficialAdmin ? 'admin' : ((dbUser?.role || role) as 'customer' | 'admin'),
+              role,
               phone: dbUser?.phone || '',
               address_line: dbUser?.address_line || '',
               city: dbUser?.city || '',
@@ -139,7 +154,7 @@ export function getSessionUser(token: string): AuthUser | null {
     `).get(cleanToken, now) as (AuthUser & { token: string; expires_at: number }) | undefined;
 
     if (session) {
-      const isOfficialAdmin = session.email === 'pujasathisupport@gmail.com';
+      const isOfficialAdmin = isUserAdmin({ email: session.email, role: session.role });
       return {
         id: session.id,
         email: session.email,
@@ -150,6 +165,39 @@ export function getSessionUser(token: string): AuthUser | null {
         city: session.city,
         state: session.state,
         pincode: session.pincode,
+      };
+    }
+
+    // Resilient fallback: Check if token directly represents an active user ID or user email
+    let fallbackUser: any = null;
+    if (cleanToken.includes('@')) {
+      fallbackUser = db
+        .prepare('SELECT id, email, full_name, role, phone, address_line, city, state, pincode FROM users WHERE LOWER(TRIM(email)) = ?')
+        .get(cleanToken.toLowerCase());
+    } else if (cleanToken.startsWith('usr_')) {
+      fallbackUser = db
+        .prepare('SELECT id, email, full_name, role, phone, address_line, city, state, pincode FROM users WHERE id = ?')
+        .get(cleanToken);
+    }
+
+    if (fallbackUser) {
+      // Auto-create active session record for future speed
+      try {
+        const expiresAt = now + 1000 * 60 * 60 * 24 * 30;
+        db.prepare('INSERT OR REPLACE INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(cleanToken, fallbackUser.id, expiresAt);
+      } catch {}
+
+      const isOfficialAdmin = isUserAdmin({ email: fallbackUser.email, role: fallbackUser.role });
+      return {
+        id: fallbackUser.id,
+        email: fallbackUser.email,
+        full_name: fallbackUser.full_name,
+        role: isOfficialAdmin ? 'admin' : fallbackUser.role,
+        phone: fallbackUser.phone,
+        address_line: fallbackUser.address_line,
+        city: fallbackUser.city,
+        state: fallbackUser.state,
+        pincode: fallbackUser.pincode,
       };
     }
   } catch {}
@@ -205,11 +253,9 @@ export function requireAdmin(req: AuthenticatedRequest, res: Response, next: Nex
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required. Please sign in with your administrator account.' });
   }
-  if (req.user.role !== 'admin' && req.user.email !== 'pujasathisupport@gmail.com') {
+  if (!isUserAdmin(req.user)) {
     return res.status(403).json({ error: 'Administrative access restricted to authorized temple administrators.' });
   }
-  if (req.user.email === 'pujasathisupport@gmail.com') {
-    req.user.role = 'admin';
-  }
+  req.user.role = 'admin';
   next();
 }

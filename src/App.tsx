@@ -90,7 +90,8 @@ export function AppContent() {
 
   // Re-fetch catalog data directly from server database (universal across all devices)
   const refreshCatalog = () => {
-    fetch('/api/pujas', { cache: 'no-store' })
+    const t = Date.now();
+    fetch(`/api/pujas?_t=${t}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.pujas && Array.isArray(data.pujas)) {
@@ -102,7 +103,7 @@ export function AppContent() {
       })
       .catch((err) => console.error('Error fetching pujas:', err));
 
-    fetch('/api/products', { cache: 'no-store' })
+    fetch(`/api/products?_t=${t}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.products && Array.isArray(data.products)) {
@@ -114,7 +115,7 @@ export function AppContent() {
       })
       .catch((err) => console.error('Error fetching products:', err));
 
-    fetch('/api/pujaris', { cache: 'no-store' })
+    fetch(`/api/pujaris?_t=${t}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.pujaris && Array.isArray(data.pujaris)) {
@@ -135,8 +136,8 @@ export function AppContent() {
       refreshCatalog();
     };
 
-    // Auto-polling every 3.5s to keep all devices automatically in sync with server changes
-    const interval = setInterval(refreshCatalog, 3500);
+    // Auto-polling every 2.5s to keep all devices automatically in sync with server changes
+    const interval = setInterval(refreshCatalog, 2500);
 
     // Cross-tab / cross-window instant notification channel
     let bc: BroadcastChannel | null = null;
@@ -148,6 +149,16 @@ export function AppContent() {
         };
       }
     } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (
+        e.key === 'pujasathi_cached_pujas' ||
+        e.key === 'pujasathi_cached_products' ||
+        e.key === 'pujasathi_cached_pujaris'
+      ) {
+        refreshCatalog();
+      }
+    };
 
     const handleCatalogUpdate = (e?: any) => {
       if (e?.detail) {
@@ -202,6 +213,7 @@ export function AppContent() {
 
     window.addEventListener('focus', handleFocus);
     window.addEventListener('visibilitychange', handleFocus);
+    window.addEventListener('storage', handleStorage);
     window.addEventListener('catalogUpdated', handleCatalogUpdate);
 
     return () => {
@@ -213,6 +225,7 @@ export function AppContent() {
       }
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleFocus);
+      window.removeEventListener('storage', handleStorage);
       window.removeEventListener('catalogUpdated', handleCatalogUpdate);
     };
   }, [currentRoute]);
@@ -240,7 +253,18 @@ export function AppContent() {
       currentRoute.startsWith('/admin') ||
       currentRoute.startsWith('/management')
     ) {
-      return <AdminDashboardPage onNavigate={navigate} onCatalogUpdated={refreshCatalog} />;
+      return (
+        <AdminDashboardPage
+          onNavigate={navigate}
+          onCatalogUpdated={refreshCatalog}
+          universalPujas={pujas}
+          universalProducts={products}
+          universalPujaris={pujaris}
+          onUpdatePujas={setPujas}
+          onUpdateProducts={setProducts}
+          onUpdatePujaris={setPujaris}
+        />
+      );
     }
 
     // 2. Order confirmation
@@ -249,9 +273,16 @@ export function AppContent() {
       return <OrderConfirmationPage orderNumber={orderNumber} onNavigate={navigate} />;
     }
 
-    // 3. Puja Detail
-    if (currentRoute.startsWith('/book-puja/')) {
-      const slug = currentRoute.replace('/book-puja/', '');
+    // 3. Puja Detail (supports /book-puja/:slug, /pujas/:slug, /puja/:slug)
+    if (
+      currentRoute.startsWith('/book-puja/') ||
+      currentRoute.startsWith('/pujas/') ||
+      currentRoute.startsWith('/puja/')
+    ) {
+      const slug = currentRoute
+        .replace('/book-puja/', '')
+        .replace('/pujas/', '')
+        .replace('/puja/', '');
       const singlePuja = pujas.find((p) => p.slug === slug || p.id === slug) || null;
       return (
         <PujaDetailPage
@@ -263,15 +294,33 @@ export function AppContent() {
       );
     }
 
-    // 4. Product Detail
-    if (currentRoute.startsWith('/puja-shop/')) {
-      const slug = currentRoute.replace('/puja-shop/', '');
+    // 4. Product Detail (supports /puja-shop/:slug, /products/:slug, /product/:slug, /shop/:slug, /essentials/:slug)
+    if (
+      currentRoute.startsWith('/puja-shop/') ||
+      currentRoute.startsWith('/products/') ||
+      currentRoute.startsWith('/product/') ||
+      currentRoute.startsWith('/shop/') ||
+      currentRoute.startsWith('/essentials/')
+    ) {
+      const slug = currentRoute
+        .replace('/puja-shop/', '')
+        .replace('/products/', '')
+        .replace('/product/', '')
+        .replace('/shop/', '')
+        .replace('/essentials/', '');
       const singleProduct = products.find((p) => p.slug === slug || p.id === slug) || null;
       return <ProductDetailPage slug={slug} product={singleProduct} onNavigate={navigate} />;
     }
 
-    // 5. Pujari Profile / Directory
-    if (currentRoute.startsWith('/pujaris')) {
+    // 5. Pujari Profile / Directory (supports /pujaris, /acharyas, /our-pujaris)
+    if (
+      currentRoute === '/pujaris' ||
+      currentRoute === '/acharyas' ||
+      currentRoute === '/our-pujaris' ||
+      currentRoute.startsWith('/pujaris') ||
+      currentRoute.startsWith('/acharyas') ||
+      currentRoute.startsWith('/pujari/')
+    ) {
       return (
         <PujarisPage
           pujaris={pujaris}
@@ -282,8 +331,14 @@ export function AppContent() {
       );
     }
 
-    // 6. Book Puja Catalog
-    if (currentRoute === '/book-puja') {
+    // 6. Book Puja Catalog (supports /book-puja, /pujas, /puja, /puja-catalog, /catalog)
+    if (
+      currentRoute === '/book-puja' ||
+      currentRoute === '/pujas' ||
+      currentRoute === '/puja' ||
+      currentRoute === '/puja-catalog' ||
+      currentRoute === '/catalog'
+    ) {
       return (
         <BookPujaPage
           pujas={pujas}
@@ -293,8 +348,14 @@ export function AppContent() {
       );
     }
 
-    // 7. Puja Shop Store
-    if (currentRoute === '/puja-shop') {
+    // 7. Puja Shop Store (supports /puja-shop, /shop, /products, /essentials, /puja-essentials)
+    if (
+      currentRoute === '/puja-shop' ||
+      currentRoute === '/shop' ||
+      currentRoute === '/products' ||
+      currentRoute === '/essentials' ||
+      currentRoute === '/puja-essentials'
+    ) {
       return <PujaShopPage products={products} onNavigate={navigate} />;
     }
 

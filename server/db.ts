@@ -227,6 +227,28 @@ function seedInitialData() {
     );
   }
 
+  // Ensure owner Subhayu Roy has permanent Administrator role
+  const subhayuAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get('subhayuroy666@gmail.com');
+  const subhayuPasswordHash = bcrypt.hashSync('Password@123', 10);
+  if (!subhayuAdmin) {
+    db.prepare(`
+      INSERT INTO users (id, email, password_hash, full_name, role, phone, address_line, city, state, pincode)
+      VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?)
+    `).run(
+      'usr_subhayu_admin',
+      'subhayuroy666@gmail.com',
+      subhayuPasswordHash,
+      'Subhayu Roy (Admin)',
+      '+91 98765 43210',
+      'Temple Road',
+      'Varanasi',
+      'Uttar Pradesh',
+      '221001'
+    );
+  } else {
+    db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run('subhayuroy666@gmail.com');
+  }
+
   // Check if legacy admin exists
   const existingAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@mandirveda.com');
   if (!existingAdmin) {

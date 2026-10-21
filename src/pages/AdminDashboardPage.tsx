@@ -51,9 +51,24 @@ import {
 interface AdminDashboardPageProps {
   onNavigate: (route: string) => void;
   onCatalogUpdated?: () => void;
+  universalPujas?: Puja[];
+  universalProducts?: Product[];
+  universalPujaris?: Pujari[];
+  onUpdatePujas?: (updater: (prev: Puja[]) => Puja[]) => void;
+  onUpdateProducts?: (updater: (prev: Product[]) => Product[]) => void;
+  onUpdatePujaris?: (updater: (prev: Pujari[]) => Pujari[]) => void;
 }
 
-export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNavigate, onCatalogUpdated }) => {
+export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
+  onNavigate,
+  onCatalogUpdated,
+  universalPujas,
+  universalProducts,
+  universalPujaris,
+  onUpdatePujas,
+  onUpdateProducts,
+  onUpdatePujaris,
+}) => {
   const { user, isLoading, login, getAuthHeaders } = useAuth();
 
   // Admin login state if unauthenticated or non-admin
@@ -86,6 +101,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [bookingsList, setBookingsList] = useState<any[]>([]);
   const [pujasList, setPujasList] = useState<Puja[]>(() => {
+    if (universalPujas && universalPujas.length > 0) return universalPujas;
     try {
       const cached = localStorage.getItem('pujasathi_cached_pujas');
       return cached ? JSON.parse(cached) : [];
@@ -95,6 +111,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   });
 
   const [productsList, setProductsList] = useState<Product[]>(() => {
+    if (universalProducts && universalProducts.length > 0) return universalProducts;
     try {
       const cached = localStorage.getItem('pujasathi_cached_products');
       return cached ? JSON.parse(cached) : [];
@@ -104,6 +121,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   });
 
   const [pujarisList, setPujarisList] = useState<Pujari[]>(() => {
+    if (universalPujaris && universalPujaris.length > 0) return universalPujaris;
     try {
       const cached = localStorage.getItem('pujasathi_cached_pujaris');
       return cached ? JSON.parse(cached) : [];
@@ -111,6 +129,26 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       return [];
     }
   });
+
+  // Sync when universal props update
+  useEffect(() => {
+    if (universalPujas && universalPujas.length > 0) {
+      setPujasList(universalPujas);
+    }
+  }, [universalPujas]);
+
+  useEffect(() => {
+    if (universalProducts && universalProducts.length > 0) {
+      setProductsList(universalProducts);
+    }
+  }, [universalProducts]);
+
+  useEffect(() => {
+    if (universalPujaris && universalPujaris.length > 0) {
+      setPujarisList(universalPujaris);
+    }
+  }, [universalPujaris]);
+
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   // Filters & Search
@@ -119,9 +157,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [searchPuja, setSearchPuja] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
+  const [searchPujari, setSearchPujari] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
+  const [modalError, setModalError] = useState('');
 
   // Selected Booking for Full Detail Inspection & Editing
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
@@ -212,15 +252,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       const authHeaders = getAuthHeaders();
       const token = typeof window !== 'undefined' ? localStorage.getItem('mv_session_token') : null;
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}`, 'x-session-token': token } : {}),
         ...authHeaders,
         ...((init.headers as Record<string, string>) || {}),
       };
 
-      if (init.body && init.body instanceof FormData) {
-        delete headers['Content-Type'];
+      if (init.body && !(init.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
       }
 
       const res = await fetch(url, { ...init, headers, credentials: 'include' });
@@ -240,6 +279,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     } catch (err: any) {
       return { ok: false, status: 0, data: { error: err.message || 'Network request failed' } };
     }
+  };
+
+  const notifyCrossDeviceCatalogUpdate = () => {
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('pujasathi_catalog_channel');
+        bc.postMessage('catalog_updated');
+        setTimeout(() => {
+          try { bc.close(); } catch {}
+        }, 150);
+      }
+    } catch {}
   };
 
   const handleFileUpload = async (
@@ -325,65 +376,96 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const loadAdminData = async () => {
     if (!user || user.role !== 'admin') return;
     setLoading(true);
+    const t = Date.now();
+
+    // 1. Metrics & overview
     try {
-      // 1. Metrics & overview
-      const mRes = await safeFetchJson('/api/admin/metrics');
+      const mRes = await safeFetchJson(`/api/admin/metrics?_t=${t}`);
       if (mRes.ok && mRes.data?.metrics) {
         setMetrics(mRes.data.metrics);
         setUpcomingBookings(mRes.data.upcoming_bookings || []);
         setRecentOrders(mRes.data.recent_orders || []);
       }
+    } catch (err) {
+      console.error('Error fetching admin metrics:', err);
+    }
 
-      // 2. Bookings (all orders enriched)
+    // 2. Bookings (all orders enriched)
+    try {
       const bRes = await safeFetchJson(
         `/api/admin/bookings?status=${statusFilter}&payment_status=${paymentFilter}&search=${encodeURIComponent(
           searchBooking
-        )}`
+        )}&_t=${t}`
       );
       if (bRes.ok && bRes.data?.bookings) {
         setBookingsList(bRes.data.bookings || []);
       }
+    } catch (err) {
+      console.error('Error fetching admin bookings:', err);
+    }
 
-      // 3. Pujas catalog (universal server DB)
-      const puCatalogRes = await safeFetchJson('/api/admin/pujas');
-      if (puCatalogRes.ok && puCatalogRes.data?.pujas) {
+    // 3. Pujas catalog (universal server DB)
+    try {
+      const puCatalogRes = await safeFetchJson(`/api/admin/pujas?_t=${t}`);
+      if (puCatalogRes.ok && puCatalogRes.data?.pujas && Array.isArray(puCatalogRes.data.pujas)) {
         setPujasList(puCatalogRes.data.pujas);
+        try {
+          localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(puCatalogRes.data.pujas));
+        } catch {}
       } else {
-        const puFallback = await safeFetchJson('/api/pujas');
-        if (puFallback.ok && puFallback.data?.pujas) {
+        const puFallback = await safeFetchJson(`/api/pujas?_t=${t}`);
+        if (puFallback.ok && puFallback.data?.pujas && Array.isArray(puFallback.data.pujas)) {
           setPujasList(puFallback.data.pujas);
         }
       }
+    } catch (err) {
+      console.error('Error fetching admin pujas:', err);
+    }
 
-      // 4. Products catalog (universal server DB)
-      const pRes = await safeFetchJson('/api/admin/products');
-      if (pRes.ok && pRes.data?.products) {
+    // 4. Products catalog (universal server DB)
+    try {
+      const pRes = await safeFetchJson(`/api/admin/products?_t=${t}`);
+      if (pRes.ok && pRes.data?.products && Array.isArray(pRes.data.products)) {
         setProductsList(pRes.data.products);
+        try {
+          localStorage.setItem('pujasathi_cached_products', JSON.stringify(pRes.data.products));
+        } catch {}
       } else {
-        const pFallback = await safeFetchJson('/api/products');
-        if (pFallback.ok && pFallback.data?.products) {
+        const pFallback = await safeFetchJson(`/api/products?_t=${t}`);
+        if (pFallback.ok && pFallback.data?.products && Array.isArray(pFallback.data.products)) {
           setProductsList(pFallback.data.products);
         }
       }
+    } catch (err) {
+      console.error('Error fetching admin products:', err);
+    }
 
-      // 5. Pujaris (universal server DB)
-      const puRes = await safeFetchJson('/api/admin/pujaris');
-      if (puRes.ok && puRes.data?.pujaris) {
+    // 5. Pujaris (universal server DB)
+    try {
+      const puRes = await safeFetchJson(`/api/admin/pujaris?_t=${t}`);
+      if (puRes.ok && puRes.data?.pujaris && Array.isArray(puRes.data.pujaris)) {
         setPujarisList(puRes.data.pujaris);
+        try {
+          localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(puRes.data.pujaris));
+        } catch {}
       } else {
-        const puFallback = await safeFetchJson('/api/pujaris');
-        if (puFallback.ok && puFallback.data?.pujaris) {
+        const puFallback = await safeFetchJson(`/api/pujaris?_t=${t}`);
+        if (puFallback.ok && puFallback.data?.pujaris && Array.isArray(puFallback.data.pujaris)) {
           setPujarisList(puFallback.data.pujaris);
         }
       }
+    } catch (err) {
+      console.error('Error fetching admin pujaris:', err);
+    }
 
-      // 6. Audit Logs
-      const aRes = await safeFetchJson('/api/admin/audit-logs');
+    // 6. Audit Logs
+    try {
+      const aRes = await safeFetchJson(`/api/admin/audit-logs?_t=${t}`);
       if (aRes.ok && aRes.data?.logs) {
         setAuditLogs(aRes.data.logs || []);
       }
     } catch (err) {
-      console.error('Error fetching admin data:', err);
+      console.error('Error fetching admin audit logs:', err);
     } finally {
       setLoading(false);
     }
@@ -396,10 +478,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       // Keep admin dashboard live with customer orders and catalog changes across all devices
       const interval = setInterval(() => {
         loadAdminData();
-      }, 3500);
+      }, 3000);
 
       const handleFocus = () => {
         loadAdminData();
+      };
+
+      const handleStorageUpdate = (e: StorageEvent) => {
+        if (
+          e.key === 'pujasathi_cached_pujas' ||
+          e.key === 'pujasathi_cached_products' ||
+          e.key === 'pujasathi_cached_pujaris'
+        ) {
+          loadAdminData();
+        }
       };
 
       let bc: BroadcastChannel | null = null;
@@ -414,6 +506,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       window.addEventListener('focus', handleFocus);
       window.addEventListener('visibilitychange', handleFocus);
+      window.addEventListener('storage', handleStorageUpdate);
 
       return () => {
         clearInterval(interval);
@@ -424,9 +517,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         }
         window.removeEventListener('focus', handleFocus);
         window.removeEventListener('visibilitychange', handleFocus);
+        window.removeEventListener('storage', handleStorageUpdate);
       };
     }
-  }, [user, statusFilter, paymentFilter, searchBooking]);
+  }, [user, activeTab, statusFilter, paymentFilter, searchBooking]);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -540,6 +634,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   // ========================================================
   const handleOpenAddPuja = () => {
     setEditingPuja(null);
+    setModalError('');
     setPujaForm({
       name: '',
       deity: 'Lord Shiva',
@@ -558,6 +653,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   const handleOpenEditPuja = (puja: Puja) => {
     setEditingPuja(puja);
+    setModalError('');
     setPujaForm({
       name: puja.name,
       deity: puja.deity,
@@ -593,12 +689,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const handleSavePuja = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pujaForm.name.trim()) {
+      setModalError('Puja ritual name is required');
       setActionError('Puja name is required');
       setTimeout(() => setActionError(''), 4000);
       return;
     }
 
     setIsSavingPuja(true);
+    setModalError('');
 
     try {
       const shortDesc =
@@ -637,20 +735,28 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setIsSavingPuja(false);
 
       if (!res.ok) {
-        setActionError(res.data?.error || 'Failed to save puja on server');
+        const errorMsg = res.data?.error || 'Failed to save puja on server';
+        setModalError(errorMsg);
+        setActionError(errorMsg);
         setTimeout(() => setActionError(''), 4000);
         return;
       }
 
+      setModalError('');
       const savedPuja: Puja = res.data?.puja;
       if (savedPuja) {
-        if (editingPuja) {
-          setPujasList((prev) =>
-            prev.map((p) => (p.id === editingPuja.id ? savedPuja : p))
-          );
-        } else {
-          setPujasList((prev) => [savedPuja, ...prev]);
-        }
+        const updatePujasFn = (prev: Puja[]) => [
+          savedPuja,
+          ...prev.filter((p) => p.id !== savedPuja.id && p.slug !== savedPuja.slug),
+        ];
+        setPujasList(updatePujasFn);
+        onUpdatePujas?.(updatePujasFn);
+        try {
+          const raw = localStorage.getItem('pujasathi_cached_pujas');
+          const list = raw ? JSON.parse(raw) : [];
+          const updated = updatePujasFn(list);
+          localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(updated));
+        } catch {}
       }
 
       setActionSuccess(
@@ -663,12 +769,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       loadAdminData();
       onCatalogUpdated?.();
+      notifyCrossDeviceCatalogUpdate();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'puja', item: savedPuja } }));
       }
     } catch (err: any) {
       setIsSavingPuja(false);
-      setActionError(err.message || 'Error saving puja');
+      const msg = err.message || 'Error saving puja';
+      setModalError(msg);
+      setActionError(msg);
       setTimeout(() => setActionError(''), 4000);
     }
   };
@@ -683,11 +792,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         return;
       }
 
-      setPujasList((prev) => prev.filter((p) => p.id !== puja.id && p.slug !== puja.slug));
+      const filterFn = (prev: Puja[]) => prev.filter((p) => p.id !== puja.id && p.slug !== puja.slug);
+      setPujasList(filterFn);
+      onUpdatePujas?.(filterFn);
+      try {
+        const raw = localStorage.getItem('pujasathi_cached_pujas');
+        if (raw) {
+          localStorage.setItem('pujasathi_cached_pujas', JSON.stringify(filterFn(JSON.parse(raw))));
+        }
+      } catch {}
+
       setActionSuccess(`Puja "${puja.name}" deleted successfully from universal database.`);
       setTimeout(() => setActionSuccess(''), 4000);
 
       onCatalogUpdated?.();
+      notifyCrossDeviceCatalogUpdate();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('catalogUpdated', {
@@ -710,6 +829,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   // ========================================================
   const handleOpenAddProduct = () => {
     setEditingProduct(null);
+    setModalError('');
     setProductForm({
       name: '',
       category: 'Puja Thalis & Vessels',
@@ -725,6 +845,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   const handleOpenEditProduct = (prod: Product) => {
     setEditingProduct(prod);
+    setModalError('');
     setProductForm({
       name: prod.name,
       category: prod.category,
@@ -757,12 +878,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.name.trim()) {
+      setModalError('Essential item name is required');
       setActionError('Product name is required');
       setTimeout(() => setActionError(''), 4000);
       return;
     }
 
     setIsSavingProduct(true);
+    setModalError('');
 
     try {
       const desc =
@@ -791,20 +914,33 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setIsSavingProduct(false);
 
       if (!res.ok) {
-        setActionError(res.data?.error || 'Failed to save product on server');
+        const errorMsg = res.data?.error || 'Failed to save product on server';
+        setModalError(errorMsg);
+        setActionError(errorMsg);
         setTimeout(() => setActionError(''), 4000);
         return;
       }
 
+      setModalError('');
       const savedProduct: Product = res.data?.product;
       if (savedProduct) {
-        if (editingProduct) {
-          setProductsList((prev) =>
-            prev.map((p) => (p.id === editingProduct.id ? savedProduct : p))
-          );
-        } else {
-          setProductsList((prev) => [savedProduct, ...prev]);
-        }
+        const updateProductsFn = (prev: Product[]) => {
+          const idx = prev.findIndex((p) => p.id === savedProduct.id || (editingProduct && p.id === editingProduct.id));
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = savedProduct;
+            return copy;
+          }
+          return [savedProduct, ...prev];
+        };
+        setProductsList(updateProductsFn);
+        onUpdateProducts?.(updateProductsFn);
+        try {
+          const raw = localStorage.getItem('pujasathi_cached_products');
+          const list = raw ? JSON.parse(raw) : [];
+          const updated = updateProductsFn(list);
+          localStorage.setItem('pujasathi_cached_products', JSON.stringify(updated));
+        } catch {}
       }
 
       setActionSuccess(
@@ -817,12 +953,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       loadAdminData();
       onCatalogUpdated?.();
+      notifyCrossDeviceCatalogUpdate();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'product', item: savedProduct } }));
       }
     } catch (err: any) {
       setIsSavingProduct(false);
-      setActionError(err.message || 'Error saving product');
+      const msg = err.message || 'Error saving product';
+      setModalError(msg);
+      setActionError(msg);
       setTimeout(() => setActionError(''), 4000);
     }
   };
@@ -837,11 +976,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         return;
       }
 
-      setProductsList((prev) => prev.filter((p) => p.id !== prod.id && p.slug !== prod.slug));
+      const filterFn = (prev: Product[]) => prev.filter((p) => p.id !== prod.id && p.slug !== prod.slug);
+      setProductsList(filterFn);
+      onUpdateProducts?.(filterFn);
+      try {
+        const raw = localStorage.getItem('pujasathi_cached_products');
+        if (raw) {
+          localStorage.setItem('pujasathi_cached_products', JSON.stringify(filterFn(JSON.parse(raw))));
+        }
+      } catch {}
+
       setActionSuccess(`Essential item "${prod.name}" removed successfully from universal inventory.`);
       setTimeout(() => setActionSuccess(''), 4000);
 
       onCatalogUpdated?.();
+      notifyCrossDeviceCatalogUpdate();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('catalogUpdated', {
@@ -886,6 +1035,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   // ========================================================
   const handleOpenAddPujari = () => {
     setEditingPujari(null);
+    setModalError('');
     setPujariForm({
       name: '',
       photo: '',
@@ -905,6 +1055,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   const handleOpenEditPujari = (pujari: Pujari) => {
     setEditingPujari(pujari);
+    setModalError('');
     setPujariForm({
       name: pujari.name,
       photo: pujari.photo || '',
@@ -925,12 +1076,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const handleSavePujari = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pujariForm.name.trim()) {
+      setModalError('Acharya full name is required');
       setActionError('Acharya name is required');
       setTimeout(() => setActionError(''), 4000);
       return;
     }
 
     setIsSavingPujari(true);
+    setModalError('');
 
     try {
       const bio =
@@ -963,20 +1116,33 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       setIsSavingPujari(false);
 
       if (!res.ok) {
-        setActionError(res.data?.error || 'Failed to save acharya on server');
+        const errorMsg = res.data?.error || 'Failed to save acharya on server';
+        setModalError(errorMsg);
+        setActionError(errorMsg);
         setTimeout(() => setActionError(''), 4000);
         return;
       }
 
+      setModalError('');
       const savedPujari: Pujari = res.data?.pujari;
       if (savedPujari) {
-        if (editingPujari) {
-          setPujarisList((prev) =>
-            prev.map((p) => (p.id === editingPujari.id ? savedPujari : p))
-          );
-        } else {
-          setPujarisList((prev) => [savedPujari, ...prev]);
-        }
+        const updatePujarisFn = (prev: Pujari[]) => {
+          const idx = prev.findIndex((p) => p.id === savedPujari.id || (editingPujari && p.id === editingPujari.id));
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = savedPujari;
+            return copy;
+          }
+          return [savedPujari, ...prev];
+        };
+        setPujarisList(updatePujarisFn);
+        onUpdatePujaris?.(updatePujarisFn);
+        try {
+          const raw = localStorage.getItem('pujasathi_cached_pujaris');
+          const list = raw ? JSON.parse(raw) : [];
+          const updated = updatePujarisFn(list);
+          localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(updated));
+        } catch {}
       }
 
       setActionSuccess(
@@ -987,12 +1153,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       loadAdminData();
       onCatalogUpdated?.();
+      notifyCrossDeviceCatalogUpdate();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: 'pujari', item: savedPujari } }));
       }
     } catch (err: any) {
       setIsSavingPujari(false);
-      setActionError(err.message || 'Error saving acharya');
+      const msg = err.message || 'Error saving acharya';
+      setModalError(msg);
+      setActionError(msg);
       setTimeout(() => setActionError(''), 4000);
     }
   };
@@ -1023,11 +1192,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         return;
       }
 
-      setPujarisList((prev) => prev.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug));
+      const filterFn = (prev: Pujari[]) => prev.filter((p) => p.id !== pujari.id && p.slug !== pujari.slug);
+      setPujarisList(filterFn);
+      onUpdatePujaris?.(filterFn);
+      try {
+        const raw = localStorage.getItem('pujasathi_cached_pujaris');
+        if (raw) {
+          localStorage.setItem('pujasathi_cached_pujaris', JSON.stringify(filterFn(JSON.parse(raw))));
+        }
+      } catch {}
+
       setActionSuccess(`Acharya "${pujari.name}" removed successfully from universal directory.`);
       setTimeout(() => setActionSuccess(''), 4000);
 
       onCatalogUpdated?.();
+      notifyCrossDeviceCatalogUpdate();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('catalogUpdated', {
@@ -1153,6 +1332,48 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               <span>Sign In to Admin Portal</span>
             </button>
           </form>
+
+          <div className="mt-5 pt-4 border-t border-[#E7DCCE]/80 space-y-2">
+            <p className="text-[11px] font-semibold text-[#78716C] text-center mb-1">
+              Authorized Temple Administrators:
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                setAdminEmail('subhayuroy666@gmail.com');
+                setAdminPassword('Password@123');
+                setAuthError('');
+                setIsLoggingIn(true);
+                const res = await login('subhayuroy666@gmail.com', 'Password@123');
+                setIsLoggingIn(false);
+                if (!res.success) {
+                  setAuthError(res.error || 'Failed to login');
+                }
+              }}
+              disabled={isLoggingIn}
+              className="w-full py-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-300 text-orange-950 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>👤 1-Click Admin Access: Subhayu Roy</span>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                setAdminEmail('pujasathisupport@gmail.com');
+                setAdminPassword('PujaSathi@2025');
+                setAuthError('');
+                setIsLoggingIn(true);
+                const res = await login('pujasathisupport@gmail.com', 'PujaSathi@2025');
+                setIsLoggingIn(false);
+                if (!res.success) {
+                  setAuthError(res.error || 'Failed to login');
+                }
+              }}
+              disabled={isLoggingIn}
+              className="w-full py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>🛡️ 1-Click Admin Access: PujaSathi Support</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1732,13 +1953,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       {activeTab === 'pujaris' && (
         <div className="space-y-5">
           <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <span className="text-sm font-bold text-[#292524]">
-                Vedic Acharyas & Scholars ({pujarisList.length})
-              </span>
-              <span className="text-xs text-[#78716C]">
-                Verified temple scholars visible in the "Our Pujaris" directory.
-              </span>
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3.5 top-3 text-[#A8A29E]" />
+              <input
+                type="text"
+                value={searchPujari}
+                onChange={(e) => setSearchPujari(e.target.value)}
+                placeholder="Search acharyas by name, specializations, or city..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-[#D1BA9C] bg-white text-xs text-[#292524] focus:outline-none"
+              />
             </div>
 
             <button
@@ -1746,7 +1969,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              <span>Add New Acharya / Pujari</span>
+              <span>+ Add New Acharya / Pujari</span>
             </button>
           </div>
 
@@ -1767,14 +1990,34 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E7DCCE]">
-                  {pujarisList.length === 0 ? (
+                  {pujarisList.filter((p) => {
+                    if (!searchPujari.trim()) return true;
+                    const q = searchPujari.toLowerCase();
+                    const name = (p.name || '').toLowerCase();
+                    const spec = (p.specializations || '').toLowerCase();
+                    const areas = (p.service_areas || '').toLowerCase();
+                    const langs = (p.languages || '').toLowerCase();
+                    return name.includes(q) || spec.includes(q) || areas.includes(q) || langs.includes(q);
+                  }).length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-[#78716C]">
-                        No acharyas found. Click "Add New Acharya / Pujari" to add one.
+                        {searchPujari
+                          ? `No acharyas matching "${searchPujari}"`
+                          : 'No acharyas found. Click "+ Add New Acharya / Pujari" to add one.'}
                       </td>
                     </tr>
                   ) : (
-                    pujarisList.map((p) => (
+                    pujarisList
+                      .filter((p) => {
+                        if (!searchPujari.trim()) return true;
+                        const q = searchPujari.toLowerCase();
+                        const name = (p.name || '').toLowerCase();
+                        const spec = (p.specializations || '').toLowerCase();
+                        const areas = (p.service_areas || '').toLowerCase();
+                        const langs = (p.languages || '').toLowerCase();
+                        return name.includes(q) || spec.includes(q) || areas.includes(q) || langs.includes(q);
+                      })
+                      .map((p) => (
                       <tr key={p.id} className="hover:bg-white/60 transition-colors">
                         <td className="p-3.5">
                           <div className="flex items-center gap-3">
@@ -2345,6 +2588,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               Set ritual name, deity, dakshina price, ceremonial duration, and shastric imagery.
             </p>
 
+            {modalError && (
+              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span className="font-medium">{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSavePuja} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -2622,6 +2872,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               Set essential item name, category, pricing, real-time inventory stock, and imagery.
             </p>
 
+            {modalError && (
+              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span className="font-medium">{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -2883,6 +3140,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             <p className="text-xs text-[#78716C] mb-6">
               Add scholar profile with photograph, description, Vedic specializations, and languages. Profile appears in the "Our Pujaris" section.
             </p>
+
+            {modalError && (
+              <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span className="font-medium">{modalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSavePujari} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

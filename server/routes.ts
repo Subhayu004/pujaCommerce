@@ -11,6 +11,7 @@ import {
   destroySession,
   requireAuth,
   requireAdmin,
+  isUserAdmin,
 } from './auth.js';
 import { generateOrderReceiptPDF, OrderReceiptData } from './receipt.js';
 
@@ -307,7 +308,7 @@ apiRouter.post('/auth/login', (req: AuthenticatedRequest, res: Response) => {
       id: user.id,
       email: user.email,
       full_name: user.full_name,
-      role: user.role,
+      role: isUserAdmin({ email: user.email, role: user.role }) ? 'admin' : user.role,
       phone: user.phone,
       address_line: user.address_line,
       city: user.city,
@@ -456,7 +457,12 @@ apiRouter.get('/auth/me', (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
     return res.json({ user: null });
   }
-  return res.json({ user: req.user });
+  return res.json({
+    user: {
+      ...req.user,
+      role: isUserAdmin(req.user) ? 'admin' : req.user.role,
+    },
+  });
 });
 
 // ==========================================
@@ -465,7 +471,7 @@ apiRouter.get('/auth/me', (req: AuthenticatedRequest, res: Response) => {
 apiRouter.get('/pujas', (req: Request, res: Response) => {
   const { search, deity, sort } = req.query;
 
-  let query = 'SELECT * FROM pujas WHERE is_active = 1';
+  let query = "SELECT * FROM pujas WHERE (is_active = 1 OR is_active IS NULL OR is_active = '1' OR is_active != 0)";
   const params: any[] = [];
 
   if (search && typeof search === 'string') {
@@ -542,7 +548,7 @@ apiRouter.post('/pujas/check-availability', (req: Request, res: Response) => {
 apiRouter.get('/pujaris', (req: Request, res: Response) => {
   const { search, language, specialization } = req.query;
 
-  let query = 'SELECT * FROM pujaris WHERE is_active = 1';
+  let query = "SELECT * FROM pujaris WHERE (is_active = 1 OR is_active IS NULL OR is_active = '1' OR is_active != 0)";
   const params: any[] = [];
 
   if (search && typeof search === 'string') {
@@ -580,7 +586,7 @@ apiRouter.get('/pujaris/:slug', (req: Request, res: Response) => {
 apiRouter.get('/products', (req: Request, res: Response) => {
   const { category, search, sort } = req.query;
 
-  let query = 'SELECT * FROM products WHERE is_active = 1';
+  let query = "SELECT * FROM products WHERE (is_active = 1 OR is_active IS NULL OR is_active = '1' OR is_active != 0)";
   const params: any[] = [];
 
   if (search && typeof search === 'string') {
@@ -1437,13 +1443,13 @@ apiRouter.post('/admin/pujas', requireAdmin, (req: AuthenticatedRequest, res: Re
     deity: z.string().optional().default('Lord Shiva'),
     short_description: z.string().optional(),
     description: z.string().optional(),
-    price_paise: z.number().int().min(1, 'Price must be greater than 0'),
-    duration_mins: z.number().int().optional().default(60),
+    price_paise: z.coerce.number().int().min(1, 'Price must be greater than 0'),
+    duration_mins: z.coerce.number().int().optional().default(60),
     image: z.string().optional().default('rudra'),
     required_materials: z.string().optional().default('Complete Vedic samagri kit included.'),
     booking_requirements: z.string().optional().default('Clean altar and traditional attire.'),
-    is_active: z.number().int().default(1),
-    featured: z.number().int().default(1),
+    is_active: z.coerce.number().int().default(1),
+    featured: z.coerce.number().int().default(1),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -1643,11 +1649,11 @@ apiRouter.post('/admin/products', requireAdmin, (req: AuthenticatedRequest, res:
     name: z.string().min(1, 'Name is required'),
     category: z.string().optional().default('Puja Thalis & Vessels'),
     description: z.string().optional(),
-    price_paise: z.number().int().min(1, 'Price must be greater than 0'),
-    stock: z.number().int().min(0, 'Stock cannot be negative').default(50),
+    price_paise: z.coerce.number().int().min(1, 'Price must be greater than 0'),
+    stock: z.coerce.number().int().min(0, 'Stock cannot be negative').default(50),
     image: z.string().default('thali'),
-    is_active: z.number().int().default(1),
-    featured: z.number().int().default(1),
+    is_active: z.coerce.number().int().default(1),
+    featured: z.coerce.number().int().default(1),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -1943,15 +1949,15 @@ apiRouter.post('/admin/pujaris', requireAdmin, (req: AuthenticatedRequest, res: 
     name: z.string().min(1, 'Pujari name is required'),
     bio: z.string().optional(),
     photo: z.string().optional().default('acharyasharma'),
-    experience_years: z.number().int().optional().default(10),
+    experience_years: z.coerce.number().int().optional().default(10),
     specializations: z.string().optional(),
     languages: z.string().optional(),
     service_areas: z.string().optional(),
     phone: z.string().optional().nullable(),
     email: z.string().optional().nullable(),
-    is_active: z.number().int().default(1),
-    rating: z.number().default(4.9),
-    review_count: z.number().int().default(12),
+    is_active: z.coerce.number().int().default(1),
+    rating: z.coerce.number().default(4.9),
+    review_count: z.coerce.number().int().default(12),
   });
 
   const parsed = schema.safeParse(req.body);

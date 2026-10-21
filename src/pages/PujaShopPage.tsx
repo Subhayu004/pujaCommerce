@@ -8,7 +8,7 @@ interface PujaShopPageProps {
   onNavigate: (route: string) => void;
 }
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { id: 'all', label: 'All Samagri' },
   { id: 'Puja Thalis & Vessels', label: 'Puja Thalis & Vessels' },
   { id: 'Brass Diyas & Lamps', label: 'Brass Diyas & Lamps' },
@@ -25,24 +25,41 @@ export const PujaShopPage: React.FC<PujaShopPageProps> = ({ products, onNavigate
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('featured');
 
+  const categories = useMemo(() => {
+    const list = [...DEFAULT_CATEGORIES];
+    (products || []).forEach((p) => {
+      const pCat = (p.category || '').trim();
+      if (pCat && !list.some((c) => c.id === pCat || c.label === pCat)) {
+        list.push({ id: pCat, label: pCat });
+      }
+    });
+    return list;
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
-    return products
+    return (products || [])
       .filter((product) => {
+        const pName = (product.name || '').toLowerCase();
+        const pDesc = (product.description || '').toLowerCase();
+        const pCat = (product.category || '').toLowerCase();
+        const q = (search || '').toLowerCase();
+
         const matchesSearch =
-          product.name.toLowerCase().includes(search.toLowerCase()) ||
-          product.description.toLowerCase().includes(search.toLowerCase()) ||
-          product.category.toLowerCase().includes(search.toLowerCase());
+          pName.includes(q) ||
+          pDesc.includes(q) ||
+          pCat.includes(q);
 
         const matchesCategory =
-          selectedCategory === 'all' || product.category === selectedCategory;
+          selectedCategory === 'all' || product.category === selectedCategory || pCat === selectedCategory.toLowerCase();
 
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
-        if (sortBy === 'price_asc') return a.price_paise - b.price_paise;
-        if (sortBy === 'price_desc') return b.price_paise - a.price_paise;
-        if (sortBy === 'stock') return b.stock - a.stock;
-        return b.featured - a.featured;
+        if (sortBy === 'price_asc') return (a.price_paise || 0) - (b.price_paise || 0);
+        if (sortBy === 'price_desc') return (b.price_paise || 0) - (a.price_paise || 0);
+        if (sortBy === 'stock') return (b.stock || 0) - (a.stock || 0);
+        if ((b.featured || 0) !== (a.featured || 0)) return (b.featured || 0) - (a.featured || 0);
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
   }, [products, search, selectedCategory, sortBy]);
 
@@ -94,7 +111,7 @@ export const PujaShopPage: React.FC<PujaShopPageProps> = ({ products, onNavigate
 
         {/* Category Segmented Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs scrollbar-thin">
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id;
             return (
               <button

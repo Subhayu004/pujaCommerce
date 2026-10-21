@@ -119,11 +119,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate, onOpen
             ) : (
               <button
                 onClick={() => handleNavClick('/admin')}
-                className="hidden lg:flex px-2.5 py-2 rounded-xl border border-[#D1BA9C]/60 hover:bg-[#F5EFEB] text-[11px] font-medium text-[#78716C] items-center gap-1 transition-colors cursor-pointer"
+                className="flex px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-xl border border-[#D1BA9C]/60 hover:bg-[#F5EFEB] text-[11px] font-medium text-[#78716C] items-center gap-1 transition-colors cursor-pointer"
                 title="Management Portal"
               >
                 <ShieldCheck className="w-3 h-3 text-[#78716C]" />
-                <span>Admin</span>
+                <span className="hidden xs:inline">Admin</span>
               </button>
             )}
 

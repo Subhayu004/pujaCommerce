@@ -24,6 +24,7 @@ export interface Puja {
   booking_requirements: string;
   is_active: number;
   featured: number;
+  created_at?: string;
 }
 
 export interface Pujari {
@@ -41,6 +42,7 @@ export interface Pujari {
   is_active: number;
   rating: number;
   review_count: number;
+  created_at?: string;
 }
 
 export interface Product {
@@ -54,6 +56,7 @@ export interface Product {
   stock: number;
   is_active: number;
   featured: number;
+  created_at?: string;
 }
 
 export interface CartItem {

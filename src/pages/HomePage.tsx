@@ -21,9 +21,17 @@ export const HomePage: React.FC<HomePageProps> = ({
   onBookPuja,
   onNavigate,
 }) => {
-  const featuredPujas = pujas.slice(0, 6);
-  const featuredProducts = products.slice(0, 8);
-  const featuredPujaris = pujaris.slice(0, 4);
+  const featuredPujas = [...pujas].sort((a, b) => {
+    if (b.featured !== a.featured) return b.featured - a.featured;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+  const featuredProducts = [...products].sort((a, b) => {
+    if (b.featured !== a.featured) return b.featured - a.featured;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
+  const featuredPujaris = [...pujaris].sort((a, b) => {
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+  });
 
   return (
     <div className="space-y-16 sm:space-y-24 pb-16">

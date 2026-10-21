@@ -20,24 +20,29 @@ export const PujarisPage: React.FC<PujarisPageProps> = ({
   const [selectedLanguage, setSelectedLanguage] = useState('all');
 
   const filteredPujaris = useMemo(() => {
-    return pujaris.filter((p) => {
-      const name = p.name || '';
-      const bio = p.bio || '';
-      const specializations = p.specializations || '';
-      const service_areas = p.service_areas || '';
-      const languages = p.languages || '';
+    return (pujaris || [])
+      .filter((p) => {
+        const name = p.name || '';
+        const bio = p.bio || '';
+        const specializations = p.specializations || '';
+        const service_areas = p.service_areas || '';
+        const languages = p.languages || '';
+        const q = (search || '').toLowerCase();
 
-      const matchesSearch =
-        name.toLowerCase().includes(search.toLowerCase()) ||
-        bio.toLowerCase().includes(search.toLowerCase()) ||
-        specializations.toLowerCase().includes(search.toLowerCase()) ||
-        service_areas.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch =
+          name.toLowerCase().includes(q) ||
+          bio.toLowerCase().includes(q) ||
+          specializations.toLowerCase().includes(q) ||
+          service_areas.toLowerCase().includes(q);
 
-      const matchesLang =
-        selectedLanguage === 'all' || languages.includes(selectedLanguage);
+        const matchesLang =
+          selectedLanguage === 'all' || languages.toLowerCase().includes(selectedLanguage.toLowerCase());
 
-      return matchesSearch && matchesLang;
-    });
+        return matchesSearch && matchesLang;
+      })
+      .sort((a, b) => {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      });
   }, [pujaris, search, selectedLanguage]);
 
   return (
