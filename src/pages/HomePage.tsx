@@ -147,16 +147,30 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {featuredPujas.map((puja) => (
-            <PujaCard
-              key={puja.id}
-              puja={puja}
-              onBook={onBookPuja}
-              onViewDetails={(slug) => onNavigate(`/book-puja/${slug}`)}
-            />
-          ))}
-        </div>
+        {featuredPujas.length === 0 ? (
+          <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-10 text-center">
+            <Flame className="w-8 h-8 text-[#D97706] mx-auto mb-2 opacity-60" />
+            <p className="text-sm font-semibold text-[#292524]">No Pujas Listed Yet</p>
+            <p className="text-xs text-[#78716C] mt-1">Temple administrators can add ceremonies via the Admin Portal or FastAPI & MongoDB Console.</p>
+            <button
+              onClick={() => onNavigate('/admin')}
+              className="mt-4 px-4 py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <span>+ Add Puja in Admin</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {featuredPujas.map((puja) => (
+              <PujaCard
+                key={puja.id}
+                puja={puja}
+                onBook={onBookPuja}
+                onViewDetails={(slug) => onNavigate(`/book-puja/${slug}`)}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 4. PUJA ESSENTIALS & SAMAGRI STORE */}
@@ -183,15 +197,29 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-          {featuredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onViewDetails={(slug) => onNavigate(`/puja-shop/${slug}`)}
-            />
-          ))}
-        </div>
+        {featuredProducts.length === 0 ? (
+          <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-10 text-center">
+            <ShoppingBag className="w-8 h-8 text-[#9A3412] mx-auto mb-2 opacity-60" />
+            <p className="text-sm font-semibold text-[#292524]">No Samagri Listed Yet</p>
+            <p className="text-xs text-[#78716C] mt-1">Temple administrators can add inventory via the Admin Portal or FastAPI & MongoDB Console.</p>
+            <button
+              onClick={() => onNavigate('/admin')}
+              className="mt-4 px-4 py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <span>+ Add Item in Admin</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+            {featuredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onViewDetails={(slug) => onNavigate(`/puja-shop/${slug}`)}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 5. PUJARI INTRODUCTION */}
@@ -218,47 +246,61 @@ export const HomePage: React.FC<HomePageProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {featuredPujaris.map((pujari) => (
-            <div
-              key={pujari.id}
-              className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
+        {featuredPujaris.length === 0 ? (
+          <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-10 text-center">
+            <Users className="w-8 h-8 text-[#B45309] mx-auto mb-2 opacity-60" />
+            <p className="text-sm font-semibold text-[#292524]">No Pujaris Registered Yet</p>
+            <p className="text-xs text-[#78716C] mt-1">Add priest profiles via the Admin Portal or FastAPI & MongoDB Console.</p>
+            <button
+              onClick={() => onNavigate('/admin')}
+              className="mt-4 px-4 py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
             >
-              <div className="flex items-start gap-3 sm:gap-4">
-                <PujariAvatar code={pujari.photo} className="w-14 h-14 sm:w-16 sm:h-16 shrink-0" />
-                <div className="min-w-0">
-                  <h3 className="text-base font-bold font-heading text-[#292524] truncate">
-                    {pujari.name}
-                  </h3>
-                  <div className="flex items-center gap-1 text-xs text-[#B45309] font-medium mt-0.5">
-                    <Star className="w-3.5 h-3.5 fill-[#F59E0B] text-[#F59E0B]" />
-                    <span className="tabular-nums">{pujari.rating}</span>
-                    <span className="text-[#78716C]">({pujari.review_count})</span>
+              <span>+ Add Pujari in Admin</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {featuredPujaris.map((pujari) => (
+              <div
+                key={pujari.id}
+                className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
+              >
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <PujariAvatar code={pujari.photo} className="w-14 h-14 sm:w-16 sm:h-16 shrink-0" />
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold font-heading text-[#292524] truncate">
+                      {pujari.name}
+                    </h3>
+                    <div className="flex items-center gap-1 text-xs text-[#B45309] font-medium mt-0.5">
+                      <Star className="w-3.5 h-3.5 fill-[#F59E0B] text-[#F59E0B]" />
+                      <span className="tabular-nums">{pujari.rating}</span>
+                      <span className="text-[#78716C]">({pujari.review_count})</span>
+                    </div>
+                    <span className="text-xs text-[#57534E] block mt-1 truncate">
+                      {pujari.experience_years} Years Experience
+                    </span>
                   </div>
-                  <span className="text-xs text-[#57534E] block mt-1 truncate">
-                    {pujari.experience_years} Years Experience
+                </div>
+
+                <p className="text-xs text-[#57534E] line-clamp-3 leading-relaxed">
+                  {pujari.bio}
+                </p>
+
+                <div className="pt-3 border-t border-[#E7DCCE] flex items-center justify-between text-xs">
+                  <span className="text-[#78716C] truncate max-w-[140px]">
+                    {pujari.languages}
                   </span>
+                  <button
+                    onClick={() => onNavigate(`/pujaris/${pujari.slug}`)}
+                    className="font-semibold text-[#9A3412] hover:text-[#7C2D12] cursor-pointer"
+                  >
+                    View Profile →
+                  </button>
                 </div>
               </div>
-
-              <p className="text-xs text-[#57534E] line-clamp-3 leading-relaxed">
-                {pujari.bio}
-              </p>
-
-              <div className="pt-3 border-t border-[#E7DCCE] flex items-center justify-between text-xs">
-                <span className="text-[#78716C] truncate max-w-[140px]">
-                  {pujari.languages}
-                </span>
-                <button
-                  onClick={() => onNavigate(`/pujaris/${pujari.slug}`)}
-                  className="font-semibold text-[#9A3412] hover:text-[#7C2D12] cursor-pointer"
-                >
-                  View Profile →
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 6. HOW IT WORKS (3 SIMPLE STEPS) */}

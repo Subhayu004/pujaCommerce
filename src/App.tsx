@@ -28,7 +28,7 @@ export function AppContent() {
     return window.location.pathname || '/';
   });
 
-  // Clean up any legacy localStorage override items so all devices are 100% in sync with the server database
+  // Clean up any legacy localStorage items so all devices are 100% in sync with the clean server database
   useEffect(() => {
     try {
       localStorage.removeItem('pujasathi_custom_pujas');
@@ -37,36 +37,16 @@ export function AppContent() {
       localStorage.removeItem('pujasathi_deleted_products');
       localStorage.removeItem('pujasathi_custom_pujaris');
       localStorage.removeItem('pujasathi_deleted_pujaris');
+      localStorage.removeItem('pujasathi_cached_pujas');
+      localStorage.removeItem('pujasathi_cached_products');
+      localStorage.removeItem('pujasathi_cached_pujaris');
     } catch {}
   }, []);
 
-  // Initialize from server cache for fast initial render
-  const [pujas, setPujas] = useState<Puja[]>(() => {
-    try {
-      const cached = localStorage.getItem('pujasathi_cached_pujas');
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const cached = localStorage.getItem('pujasathi_cached_products');
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [pujaris, setPujaris] = useState<Pujari[]>(() => {
-    try {
-      const cached = localStorage.getItem('pujasathi_cached_pujaris');
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Clean empty state initially, populated by live server database
+  const [pujas, setPujas] = useState<Puja[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [pujaris, setPujaris] = useState<Pujari[]>([]);
 
   // Modals
   const [bookingPuja, setBookingPuja] = useState<Puja | null>(null);

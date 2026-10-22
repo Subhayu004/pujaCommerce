@@ -95,66 +95,73 @@ export const PujarisPage: React.FC<PujarisPageProps> = ({
       </div>
 
       {/* Pujari Profiles Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-        {filteredPujaris.map((pujari) => (
-          <div
-            key={pujari.id}
-            className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-4 sm:p-7 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-5"
-          >
-            <div>
-              <div className="flex items-start gap-3 sm:gap-4">
-                <PujariAvatar code={pujari.photo} className="w-16 h-16 sm:w-20 sm:h-20 shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-lg font-bold font-heading text-[#292524]">
-                      {pujari.name}
-                    </h2>
-                    <div className="flex items-center gap-1 text-xs text-[#B45309] font-medium bg-[#FEF3C7] px-2 py-0.5 rounded-lg border border-[#F59E0B]/30">
-                      <Star className="w-3.5 h-3.5 fill-[#F59E0B] text-[#F59E0B]" />
-                      <span className="tabular-nums font-bold">{pujari.rating}</span>
-                      <span className="text-[#78716C]">({pujari.review_count})</span>
+      {filteredPujaris.length === 0 ? (
+        <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-12 text-center text-[#78716C]">
+          <p className="text-base font-semibold text-[#292524]">No pujaris found</p>
+          <p className="text-xs mt-1">Try clearing your search query or selecting All Languages.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+          {filteredPujaris.map((pujari) => (
+            <div
+              key={pujari.id}
+              className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-4 sm:p-7 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between space-y-5"
+            >
+              <div>
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <PujariAvatar code={pujari.photo} className="w-16 h-16 sm:w-20 sm:h-20 shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="text-lg font-bold font-heading text-[#292524]">
+                        {pujari.name}
+                      </h2>
+                      <div className="flex items-center gap-1 text-xs text-[#B45309] font-medium bg-[#FEF3C7] px-2 py-0.5 rounded-lg border border-[#F59E0B]/30">
+                        <Star className="w-3.5 h-3.5 fill-[#F59E0B] text-[#F59E0B]" />
+                        <span className="tabular-nums font-bold">{pujari.rating}</span>
+                        <span className="text-[#78716C]">({pujari.review_count})</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-[#78716C] mt-1">
+                      <Award className="w-3.5 h-3.5 text-[#9A3412]" />
+                      <span>{pujari.experience_years} Years Shastric Experience</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-[#57534E] mt-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#9A3412]" />
+                      <span>{pujari.service_areas}</span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-1.5 text-xs text-[#78716C] mt-1">
-                    <Award className="w-3.5 h-3.5 text-[#9A3412]" />
-                    <span>{pujari.experience_years} Years Shastric Experience</span>
+                <p className="text-xs text-[#44403C] mt-4 leading-relaxed">
+                  {pujari.bio}
+                </p>
+
+                {/* Specializations and Languages */}
+                <div className="mt-4 pt-3 border-t border-[#E7DCCE] space-y-2 text-xs">
+                  <div>
+                    <span className="font-semibold text-[#78350F]">Specializations: </span>
+                    <span className="text-[#57534E]">{pujari.specializations}</span>
                   </div>
-
-                  <div className="flex items-center gap-1.5 text-xs text-[#57534E] mt-1">
-                    <MapPin className="w-3.5 h-3.5 text-[#9A3412]" />
-                    <span>{pujari.service_areas}</span>
+                  <div>
+                    <span className="font-semibold text-[#78350F]">Languages: </span>
+                    <span className="text-[#57534E]">{pujari.languages}</span>
                   </div>
                 </div>
               </div>
 
-              <p className="text-xs text-[#44403C] mt-4 leading-relaxed">
-                {pujari.bio}
-              </p>
-
-              {/* Specializations and Languages */}
-              <div className="mt-4 pt-3 border-t border-[#E7DCCE] space-y-2 text-xs">
-                <div>
-                  <span className="font-semibold text-[#78350F]">Specializations: </span>
-                  <span className="text-[#57534E]">{pujari.specializations}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-[#78350F]">Languages: </span>
-                  <span className="text-[#57534E]">{pujari.languages}</span>
-                </div>
+              {/* Acharya Verification status */}
+              <div className="pt-3 border-t border-[#E7DCCE] flex items-center justify-between gap-3">
+                <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block" />
+                  <span>Verified Scholar</span>
+                </span>
               </div>
             </div>
-
-            {/* Acharya Verification status */}
-            <div className="pt-3 border-t border-[#E7DCCE] flex items-center justify-between gap-3">
-              <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block" />
-                <span>Verified Scholar</span>
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
