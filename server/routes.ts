@@ -27,6 +27,13 @@ import {
   createPujariInMongo,
   updatePujariInMongo,
   deletePujariFromMongo,
+  saveCartToMongo,
+  getCartFromMongo,
+  deleteCartFromMongo,
+  saveOrderToMongo,
+  getOrderFromMongo,
+  updateOrderInMongo,
+  getUserOrdersFromMongo,
 } from './mongoBridge.js';
 
 export const apiRouter = Router();
@@ -50,76 +57,58 @@ function getOrCreateCartId(req: AuthenticatedRequest, res: Response): string {
 
   // 1. If user is authenticated:
   if (req.user) {
-    // If staff/admin:
-    // They are administrators, NOT retail shoppers.
-    // They must NEVER adopt, view, or inherit devotee carts!
-    if (req.user.role === 'admin') {
-      const staffCart = db.prepare('SELECT id, session_token FROM carts WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1').get(req.user.id) as { id: string; session_token: string } | undefined;
-      if (staffCart) {
-        res.setHeader('x-cart-token', staffCart.session_token);
-        return staffCart.id;
-      }
-      const newStaffCartId = 'crt_staff_' + crypto.randomBytes(12).toString('hex');
-      const staffToken = clientCartToken || ('cart_staff_' + crypto.randomBytes(18).toString('hex'));
-      db.prepare(`
-        INSERT INTO carts (id, user_id, session_token, created_at, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `).run(newStaffCartId, req.user.id, staffToken);
-      res.setHeader('x-cart-token', staffToken);
-      return newStaffCartId;
+    const userId = req.user.id;
+
+    // Check if an existing cart exists for this user_id
+    const userCart = db.prepare('SELECT id, session_token FROM carts WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1').get(userId) as { id: string; session_token: string } | undefined;
+
+    // Check if clientCartToken corresponds to an existing cart in DB
+    let tokenCart: { id: string; user_id?: string | null; session_token: string } | undefined;
+    if (clientCartToken) {
+      tokenCart = db.prepare('SELECT id, user_id, session_token FROM carts WHERE session_token = ?').get(clientCartToken) as any;
     }
 
-    // Customer / Devotee account:
-    // First, look for an active cart already owned by this customer
-    const userCart = db.prepare('SELECT id, session_token FROM carts WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1').get(req.user.id) as { id: string; session_token: string } | undefined;
-    if (userCart) {
-      // If devotee also brought an anonymous guest cart token that has items, merge those items into the devotee's cart
-      if (clientCartToken && clientCartToken !== userCart.session_token) {
-        const guestCart = db.prepare('SELECT id FROM carts WHERE session_token = ? AND (user_id IS NULL OR user_id = ?)').get(clientCartToken, req.user.id) as { id: string } | undefined;
-        if (guestCart && guestCart.id !== userCart.id) {
-          db.prepare('UPDATE cart_items SET cart_id = ? WHERE cart_id = ?').run(userCart.id, guestCart.id);
-          db.prepare('DELETE FROM carts WHERE id = ?').run(guestCart.id);
-        }
-      }
+    // If both exist and they are distinct carts:
+    if (userCart && tokenCart && userCart.id !== tokenCart.id) {
+      // Merge items from tokenCart into userCart
+      db.prepare('UPDATE cart_items SET cart_id = ? WHERE cart_id = ?').run(userCart.id, tokenCart.id);
+      db.prepare('DELETE FROM carts WHERE id = ?').run(tokenCart.id);
       res.setHeader('x-cart-token', userCart.session_token);
       return userCart.id;
     }
 
-    // Customer has no existing cart in DB yet.
-    // Check if they came with an unowned guest cart token or client token
-    if (clientCartToken) {
-      const existingCart = db.prepare('SELECT id, user_id FROM carts WHERE session_token = ?').get(clientCartToken) as { id: string; user_id?: string | null } | undefined;
-      if (existingCart) {
-        // Link this cart to the customer
-        db.prepare('UPDATE carts SET user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.user.id, existingCart.id);
-        res.setHeader('x-cart-token', clientCartToken);
-        return existingCart.id;
-      }
-
-      // If token provided by client, create cart using that exact token!
-      const newCartId = 'crt_user_' + crypto.randomBytes(12).toString('hex');
-      db.prepare(`
-        INSERT INTO carts (id, user_id, session_token, created_at, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `).run(newCartId, req.user.id, clientCartToken);
-      res.setHeader('x-cart-token', clientCartToken);
-      return newCartId;
+    if (userCart) {
+      res.setHeader('x-cart-token', userCart.session_token);
+      return userCart.id;
     }
 
-    // Generate brand new user cart
+    if (tokenCart) {
+      // Adopt this tokenCart for the user
+      db.prepare('UPDATE carts SET user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(userId, tokenCart.id);
+      res.setHeader('x-cart-token', tokenCart.session_token);
+      return tokenCart.id;
+    }
+
+    // Customer has no existing cart; create new user cart with clientCartToken if available
     const newCartId = 'crt_user_' + crypto.randomBytes(12).toString('hex');
-    const userToken = 'cart_user_' + crypto.randomBytes(18).toString('hex');
+    const token = clientCartToken || ('cart_usr_' + crypto.randomBytes(18).toString('hex'));
     db.prepare(`
       INSERT INTO carts (id, user_id, session_token, created_at, updated_at)
       VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `).run(newCartId, req.user.id, userToken);
-    res.setHeader('x-cart-token', userToken);
+    `).run(newCartId, userId, token);
+
+    res.cookie('mv_cart_token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
+    res.setHeader('x-cart-token', token);
     return newCartId;
   }
 
   // 2. Unauthenticated Guest:
   if (clientCartToken) {
-    const existing = db.prepare('SELECT id, user_id FROM carts WHERE session_token = ?').get(clientCartToken) as { id: string; user_id?: string | null } | undefined;
+    const existing = db.prepare('SELECT id, user_id, session_token FROM carts WHERE session_token = ?').get(clientCartToken) as { id: string; user_id?: string | null; session_token: string } | undefined;
     if (existing) {
       res.setHeader('x-cart-token', clientCartToken);
       return existing.id;
@@ -158,6 +147,68 @@ function getOrCreateCartId(req: AuthenticatedRequest, res: Response): string {
   return newGuestCartId;
 }
 
+// Asynchronously restores cart items from MongoDB Atlas if SQLite cart has 0 items
+async function syncCartFromMongoIfEmpty(cartId: string, token?: string, userId?: string | null): Promise<void> {
+  try {
+    const countRow = db.prepare('SELECT count(*) as count FROM cart_items WHERE cart_id = ?').get(cartId) as { count: number };
+    if (countRow && countRow.count > 0) {
+      return; // Already has items in SQLite
+    }
+
+    // Search MongoDB using token, cartId, or userId
+    const lookupKey = token || userId || cartId;
+    if (!lookupKey) return;
+
+    const mongoCart = await getCartFromMongo(lookupKey);
+    if (!mongoCart || !Array.isArray(mongoCart.items) || mongoCart.items.length === 0) {
+      return;
+    }
+
+    // Restore items into SQLite
+    const insertItem = db.prepare(`
+      INSERT OR REPLACE INTO cart_items (
+        id, cart_id, item_type, puja_id, product_id,
+        scheduled_date, scheduled_time, pujari_id, preferred_language,
+        service_location, additional_notes, price_paise, quantity
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const item of mongoCart.items) {
+      const itemId = item.id || ('cit_' + crypto.randomBytes(8).toString('hex'));
+      insertItem.run(
+        itemId,
+        cartId,
+        item.item_type || 'puja',
+        item.puja_id || null,
+        item.product_id || null,
+        item.scheduled_date || null,
+        item.scheduled_time || null,
+        item.pujari_id || null,
+        item.preferred_language || null,
+        item.service_location || null,
+        item.additional_notes || null,
+        Number(item.price_paise) || 0,
+        Number(item.quantity) || 1
+      );
+    }
+  } catch (err) {
+    console.error('Error syncing cart from MongoDB Atlas:', err);
+  }
+}
+
+// Background sync of local cart state to MongoDB Atlas
+function persistCartToMongoAsync(cartId: string, token: string, userId: string | null) {
+  try {
+    const rawItems = db.prepare('SELECT * FROM cart_items WHERE cart_id = ?').all(cartId) as any[];
+    saveCartToMongo(cartId, token, userId, rawItems).catch((err) => {
+      console.error('Async Mongo cart save error:', err);
+    });
+  } catch (err) {
+    console.error('persistCartToMongoAsync error:', err);
+  }
+}
+
 function calculateCartTotals(cartId: string) {
   const items = db.prepare(`
     SELECT ci.*, 
@@ -180,14 +231,14 @@ function calculateCartTotals(cartId: string) {
     let inStock = true;
 
     if (item.item_type === 'puja') {
-      title = item.puja_title || 'Sacred Puja';
+      title = item.puja_title || 'Sacred Puja Ritual';
       price_paise = item.puja_current_price || item.price_paise;
       image = item.puja_image;
     } else {
       title = item.product_title || 'Puja Samagri Item';
       price_paise = item.product_current_price || item.price_paise;
       image = item.product_image;
-      if (item.product_stock !== undefined && item.quantity > item.product_stock) {
+      if (typeof item.product_stock === 'number' && item.quantity > item.product_stock) {
         inStock = false;
       }
     }
@@ -789,8 +840,10 @@ apiRouter.get('/products/:slug', (req: Request, res: Response) => {
 // ==========================================
 // 5. CART ROUTES (CRITICAL FEATURE SECTION 6)
 // ==========================================
-apiRouter.get('/cart', (req: AuthenticatedRequest, res: Response) => {
+apiRouter.get('/cart', async (req: AuthenticatedRequest, res: Response) => {
   const cartId = getOrCreateCartId(req, res);
+  const clientToken = (req.headers['x-cart-token'] as string) || req.cookies?.mv_cart_token;
+  await syncCartFromMongoIfEmpty(cartId, clientToken, req.user?.id);
   const cartData = calculateCartTotals(cartId);
   return res.json(cartData);
 });
@@ -910,6 +963,8 @@ apiRouter.post('/cart/add-puja', (req: AuthenticatedRequest, res: Response) => {
   }
 
   const updatedCart = calculateCartTotals(cartId);
+  const token = (res.getHeader('x-cart-token') as string) || (req.headers['x-cart-token'] as string) || cartId;
+  persistCartToMongoAsync(cartId, token, req.user?.id || null);
 
   // Return success response with newly added item ID and cart data
   return res.json({
@@ -966,6 +1021,9 @@ apiRouter.post('/cart/add-product', (req: AuthenticatedRequest, res: Response) =
   }
 
   const updatedCart = calculateCartTotals(cartId);
+  const token = (res.getHeader('x-cart-token') as string) || (req.headers['x-cart-token'] as string) || cartId;
+  persistCartToMongoAsync(cartId, token, req.user?.id || null);
+
   return res.json({
     success: true,
     cart: updatedCart,
@@ -998,7 +1056,11 @@ apiRouter.put('/cart/item/:id', (req: AuthenticatedRequest, res: Response) => {
     db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(quantity, itemId);
   }
 
-  return res.json({ success: true, cart: calculateCartTotals(cartId) });
+  const updatedCart = calculateCartTotals(cartId);
+  const token = (res.getHeader('x-cart-token') as string) || (req.headers['x-cart-token'] as string) || cartId;
+  persistCartToMongoAsync(cartId, token, req.user?.id || null);
+
+  return res.json({ success: true, cart: updatedCart });
 });
 
 apiRouter.delete('/cart/item/:id', (req: AuthenticatedRequest, res: Response) => {
@@ -1006,13 +1068,18 @@ apiRouter.delete('/cart/item/:id', (req: AuthenticatedRequest, res: Response) =>
   const cartId = getOrCreateCartId(req, res);
 
   db.prepare('DELETE FROM cart_items WHERE id = ? AND cart_id = ?').run(itemId, cartId);
-  return res.json({ success: true, cart: calculateCartTotals(cartId) });
+  const updatedCart = calculateCartTotals(cartId);
+  const token = (res.getHeader('x-cart-token') as string) || (req.headers['x-cart-token'] as string) || cartId;
+  persistCartToMongoAsync(cartId, token, req.user?.id || null);
+
+  return res.json({ success: true, cart: updatedCart });
 });
+
 
 // ==========================================
 // 6. CHECKOUT & RAZORPAY INTEGRATION (SECTIONS 10 & 11)
 // ==========================================
-apiRouter.post('/checkout/create-order', (req: AuthenticatedRequest, res: Response) => {
+apiRouter.post('/checkout/create-order', async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Please sign in or create an account to proceed with checkout.' });
   }
@@ -1028,6 +1095,7 @@ apiRouter.post('/checkout/create-order', (req: AuthenticatedRequest, res: Respon
     state: z.string().min(2, 'State is required'),
     pincode: z.string().min(4, 'PIN Code is required'),
     customer_notes: z.string().optional(),
+    items: z.array(z.any()).optional(),
   });
 
   const parsed = schema.safeParse(req.body);
@@ -1036,7 +1104,53 @@ apiRouter.post('/checkout/create-order', (req: AuthenticatedRequest, res: Respon
   }
 
   const cartId = getOrCreateCartId(req, res);
-  const cart = calculateCartTotals(cartId);
+  const clientToken = (req.headers['x-cart-token'] as string) || req.cookies?.mv_cart_token;
+
+  // 1. Sync from MongoDB Atlas if SQLite cart has 0 items (e.g. cross-lambda serverless cold-start on Vercel)
+  await syncCartFromMongoIfEmpty(cartId, clientToken, req.user?.id);
+  let cart = calculateCartTotals(cartId);
+
+  // 2. Fail-safe item recovery: if SQLite was still empty but client provided the cart items
+  if (cart.items.length === 0 && Array.isArray(parsed.data.items) && parsed.data.items.length > 0) {
+    const insertItem = db.prepare(`
+      INSERT OR REPLACE INTO cart_items (
+        id, cart_id, item_type, puja_id, product_id,
+        scheduled_date, scheduled_time, pujari_id, preferred_language,
+        service_location, additional_notes, price_paise, quantity
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const item of parsed.data.items) {
+      const itemId = item.id || ('cit_' + crypto.randomBytes(8).toString('hex'));
+      let verifiedPrice = Number(item.price_paise) || 0;
+      if (item.item_type === 'puja' && item.puja_id) {
+        const p = db.prepare('SELECT price_paise FROM pujas WHERE id = ?').get(item.puja_id) as any;
+        if (p) verifiedPrice = p.price_paise;
+      } else if (item.product_id) {
+        const pr = db.prepare('SELECT price_paise FROM products WHERE id = ?').get(item.product_id) as any;
+        if (pr) verifiedPrice = pr.price_paise;
+      }
+
+      insertItem.run(
+        itemId,
+        cartId,
+        item.item_type || 'puja',
+        item.puja_id || null,
+        item.product_id || null,
+        item.scheduled_date || null,
+        item.scheduled_time || null,
+        item.pujari_id || null,
+        item.preferred_language || null,
+        item.service_location || null,
+        item.additional_notes || null,
+        verifiedPrice,
+        Number(item.quantity) || 1
+      );
+    }
+    cart = calculateCartTotals(cartId);
+    persistCartToMongoAsync(cartId, clientToken || cartId, req.user?.id || null);
+  }
 
   if (cart.items.length === 0) {
     return res.status(400).json({ error: 'Your cart is empty' });
@@ -1083,7 +1197,7 @@ apiRouter.post('/checkout/create-order', (req: AuthenticatedRequest, res: Respon
   const orderNumber = 'MV-2026-' + Math.floor(10000 + Math.random() * 90000);
   const razorpayOrderId = 'order_rzp_' + crypto.randomBytes(10).toString('hex');
 
-  // Insert Order in pending state
+  // Insert Order in pending state in SQLite
   db.prepare(`
     INSERT INTO orders (
       id, order_number, user_id, customer_name, customer_email, customer_phone,
@@ -1143,6 +1257,34 @@ apiRouter.post('/checkout/create-order', (req: AuthenticatedRequest, res: Respon
     );
   }
 
+  // Persist Order asynchronously to MongoDB Atlas for 100% Vercel serverless persistence
+  saveOrderToMongo(
+    {
+      id: orderId,
+      order_number: orderNumber,
+      user_id: req.user?.id || null,
+      customer_name: customerData.customer_name,
+      customer_email: orderEmail,
+      customer_phone: customerData.customer_phone,
+      address_line: customerData.address_line,
+      city: customerData.city,
+      state: customerData.state,
+      pincode: customerData.pincode,
+      country: 'India',
+      customer_notes: customerData.customer_notes || null,
+      subtotal_paise: cart.subtotal_paise,
+      tax_paise: cart.tax_paise,
+      delivery_paise: cart.delivery_paise,
+      discount_paise: cart.discount_paise,
+      total_paise: cart.total_paise,
+      payment_status: 'pending',
+      booking_status: 'pending',
+      razorpay_order_id: razorpayOrderId,
+      created_at: new Date(),
+    },
+    cart.items
+  ).catch((e) => console.error('Error saving order to MongoDB Atlas:', e));
+
   return res.json({
     success: true,
     order_id: orderId,
@@ -1154,14 +1296,66 @@ apiRouter.post('/checkout/create-order', (req: AuthenticatedRequest, res: Respon
 });
 
 // Server-side payment verification (Razorpay signature validation)
-apiRouter.post('/checkout/verify-payment', (req: AuthenticatedRequest, res: Response) => {
+apiRouter.post('/checkout/verify-payment', async (req: AuthenticatedRequest, res: Response) => {
   const { order_id, razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
 
   if (!order_id || !razorpay_payment_id) {
     return res.status(400).json({ error: 'Missing payment verification credentials' });
   }
 
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id) as any;
+  let order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id) as any;
+
+  // If order missing from SQLite (e.g. on new Vercel lambda container), hydrate from MongoDB Atlas!
+  if (!order) {
+    const mongoOrderData = await getOrderFromMongo(order_id);
+    if (mongoOrderData && mongoOrderData.order) {
+      const o = mongoOrderData.order;
+      db.prepare(`
+        INSERT OR REPLACE INTO orders (
+          id, order_number, user_id, customer_name, customer_email, customer_phone,
+          address_line, city, state, pincode, country, customer_notes,
+          subtotal_paise, tax_paise, delivery_paise, discount_paise, total_paise,
+          payment_status, booking_status, razorpay_order_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        o.id, o.order_number, o.user_id, o.customer_name, o.customer_email, o.customer_phone,
+        o.address_line, o.city, o.state, o.pincode, o.country || 'India', o.customer_notes,
+        o.subtotal_paise, o.tax_paise, o.delivery_paise, o.discount_paise || 0, o.total_paise,
+        o.payment_status || 'pending', o.booking_status || 'pending', o.razorpay_order_id
+      );
+      if (Array.isArray(mongoOrderData.items)) {
+        for (const it of mongoOrderData.items) {
+          db.prepare(`
+            INSERT OR REPLACE INTO order_items (
+              id, order_id, item_type, puja_id, product_id, item_name,
+              price_paise, quantity, scheduled_date, scheduled_time, pujari_id,
+              pujari_name, preferred_language, service_location, notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            it.id || ('oit_' + crypto.randomBytes(8).toString('hex')),
+            o.id,
+            it.item_type || 'puja',
+            it.puja_id || null,
+            it.product_id || null,
+            it.name || it.item_name || 'Sacred Item',
+            it.price_paise,
+            it.quantity,
+            it.scheduled_date || null,
+            it.scheduled_time || null,
+            it.pujari_id || null,
+            it.pujari_name || null,
+            it.preferred_language || null,
+            it.service_location || null,
+            it.notes || null
+          );
+        }
+      }
+      order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id) as any;
+    }
+  }
+
   if (!order) {
     return res.status(404).json({ error: 'Order not found' });
   }
@@ -1171,7 +1365,6 @@ apiRouter.post('/checkout/verify-payment', (req: AuthenticatedRequest, res: Resp
   }
 
   // Cryptographic signature verification
-  // In live mode with process.env.RAZORPAY_KEY_SECRET:
   const keySecret = process.env.RAZORPAY_KEY_SECRET || 'mandirveda_secret_key_prod_test';
   const generatedSignature = crypto
     .createHmac('sha256', keySecret)
@@ -1183,6 +1376,7 @@ apiRouter.post('/checkout/verify-payment', (req: AuthenticatedRequest, res: Resp
 
   if (!isSignatureValid) {
     db.prepare("UPDATE orders SET payment_status = 'failed' WHERE id = ?").run(order.id);
+    updateOrderInMongo(order.id, { payment_status: 'failed' }).catch(() => {});
     return res.status(400).json({ error: 'Payment signature verification failed. Order not marked paid.' });
   }
 
@@ -1211,6 +1405,17 @@ apiRouter.post('/checkout/verify-payment', (req: AuthenticatedRequest, res: Resp
     db.prepare('DELETE FROM cart_items WHERE cart_id = ?').run(cartId);
 
     db.exec('COMMIT');
+
+    // Update in MongoDB Atlas
+    updateOrderInMongo(order.id, {
+      payment_status: 'paid',
+      booking_status: 'confirmed',
+      payment_id: razorpay_payment_id,
+      razorpay_signature,
+    }).catch(() => {});
+
+    const clientToken = (req.headers['x-cart-token'] as string) || req.cookies?.mv_cart_token;
+    deleteCartFromMongo(clientToken || cartId).catch(() => {});
   } catch (err) {
     db.exec('ROLLBACK');
     console.error('Error in order verification transaction:', err);
@@ -1245,6 +1450,7 @@ apiRouter.post('/checkout/webhook', (req: Request, res: Response) => {
           SET payment_status = 'paid', booking_status = 'confirmed', payment_id = ?
           WHERE id = ? AND payment_status != 'paid'
         `).run(payment.id, order.id);
+        updateOrderInMongo(order.id, { payment_status: 'paid', booking_status: 'confirmed', payment_id: payment.id }).catch(() => {});
       }
     }
   }
@@ -1255,7 +1461,7 @@ apiRouter.post('/checkout/webhook', (req: Request, res: Response) => {
 // ==========================================
 // 7. ORDER DETAILS & PDF RECEIPT (SECTION 12 & 13)
 // ==========================================
-apiRouter.get('/orders/my-orders', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+apiRouter.get('/orders/my-orders', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
   const orders = db.prepare(`
     SELECT * FROM orders
@@ -1275,17 +1481,38 @@ apiRouter.get('/orders/my-orders', requireAuth, (req: AuthenticatedRequest, res:
     }
   }
 
-  const enrichedOrders = orders.map((o) => ({
+  let enrichedOrders = orders.map((o) => ({
     ...o,
     items: itemsByOrder[o.id] || [],
   }));
 
+  // If local list is empty, also check MongoDB Atlas
+  if (enrichedOrders.length === 0) {
+    const mongoOrders = await getUserOrdersFromMongo(userId || req.user!.email);
+    if (mongoOrders.length > 0) {
+      enrichedOrders = mongoOrders;
+    }
+  }
+
   return res.json({ orders: enrichedOrders });
 });
 
-apiRouter.get('/orders/:orderNumber', (req: AuthenticatedRequest, res: Response) => {
+apiRouter.get('/orders/:orderNumber', async (req: AuthenticatedRequest, res: Response) => {
   const { orderNumber } = req.params;
-  const order = db.prepare('SELECT * FROM orders WHERE order_number = ? OR id = ?').get(orderNumber, orderNumber) as any;
+  let order = db.prepare('SELECT * FROM orders WHERE order_number = ? OR id = ?').get(orderNumber, orderNumber) as any;
+  let items: any[] = [];
+
+  if (order) {
+    items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+  } else {
+    // Try restoring from MongoDB Atlas
+    const mongoOrderData = await getOrderFromMongo(orderNumber);
+    if (mongoOrderData && mongoOrderData.order) {
+      order = mongoOrderData.order;
+      items = mongoOrderData.items || [];
+    }
+  }
+
   if (!order) {
     return res.status(404).json({ error: 'Order not found' });
   }
@@ -1295,9 +1522,9 @@ apiRouter.get('/orders/:orderNumber', (req: AuthenticatedRequest, res: Response)
     return res.status(403).json({ error: 'Access denied to this order' });
   }
 
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
   return res.json({ order: { ...order, items } });
 });
+
 
 // Download PDF Receipt
 apiRouter.get('/orders/:orderNumber/receipt', (req: AuthenticatedRequest, res: Response) => {

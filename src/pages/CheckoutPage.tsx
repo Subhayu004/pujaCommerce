@@ -73,8 +73,10 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onNavigate }) => {
           state: state.trim(),
           pincode: pincode.trim(),
           customer_notes: notes.trim(),
+          items: cart.items,
         }),
       });
+
 
       const returnedToken = res.headers.get('x-cart-token');
       if (returnedToken) {

@@ -453,3 +453,172 @@ export async function deletePujariFromMongo(id: string): Promise<boolean> {
     return false;
   }
 }
+
+// ==========================================
+// CARTS PERSISTENCE (FOR VERCEL MULTI-LAMBDA CONTINUITY)
+// ==========================================
+export async function saveCartToMongo(
+  cartId: string,
+  token: string,
+  userId: string | null,
+  items: any[]
+): Promise<boolean> {
+  try {
+    const db = await getMongoDb();
+    const cleanItems = (items || []).map((i) => ({
+      id: i.id || ('cit_' + Math.random().toString(36).substring(2)),
+      item_type: i.item_type || 'puja',
+      puja_id: i.puja_id || null,
+      product_id: i.product_id || null,
+      scheduled_date: i.scheduled_date || null,
+      scheduled_time: i.scheduled_time || null,
+      pujari_id: i.pujari_id || null,
+      preferred_language: i.preferred_language || null,
+      service_location: i.service_location || null,
+      additional_notes: i.additional_notes || null,
+      price_paise: Number(i.price_paise) || 0,
+      quantity: Number(i.quantity) || 1,
+    }));
+
+    await db.collection('carts').updateOne(
+      { $or: [{ session_token: token }, { cart_id: cartId }, ...(userId ? [{ user_id: userId }] : [])] },
+      {
+        $set: {
+          cart_id: cartId,
+          session_token: token,
+          user_id: userId || null,
+          items: cleanItems,
+          updated_at: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+    return true;
+  } catch (err) {
+    console.error('Error saving cart to MongoDB Atlas:', err);
+    return false;
+  }
+}
+
+export async function getCartFromMongo(
+  tokenOrUserId: string
+): Promise<{ cart_id: string; session_token: string; user_id?: string | null; items: any[] } | null> {
+  try {
+    const db = await getMongoDb();
+    const doc = await db.collection('carts').findOne({
+      $or: [
+        { session_token: tokenOrUserId },
+        { cart_id: tokenOrUserId },
+        { user_id: tokenOrUserId },
+      ],
+    });
+    if (!doc) return null;
+    return {
+      cart_id: doc.cart_id,
+      session_token: doc.session_token,
+      user_id: doc.user_id,
+      items: doc.items || [],
+    };
+  } catch (err) {
+    console.error('Error fetching cart from MongoDB Atlas:', err);
+    return null;
+  }
+}
+
+export async function deleteCartFromMongo(cartIdOrToken: string): Promise<boolean> {
+  try {
+    const db = await getMongoDb();
+    await db.collection('carts').deleteOne({
+      $or: [{ session_token: cartIdOrToken }, { cart_id: cartIdOrToken }],
+    });
+    return true;
+  } catch (err) {
+    console.error('Error deleting cart from MongoDB Atlas:', err);
+    return false;
+  }
+}
+
+// ==========================================
+// ORDERS PERSISTENCE (ACROSS SERVERLESS LAMBDAS)
+// ==========================================
+export async function saveOrderToMongo(order: any, items: any[]): Promise<boolean> {
+  try {
+    const db = await getMongoDb();
+    await db.collection('orders').updateOne(
+      { id: order.id },
+      {
+        $set: {
+          ...order,
+          items: items || [],
+          updated_at: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+    return true;
+  } catch (err) {
+    console.error('Error saving order to MongoDB Atlas:', err);
+    return false;
+  }
+}
+
+export async function getOrderFromMongo(
+  orderIdOrNumber: string
+): Promise<{ order: any; items: any[] } | null> {
+  try {
+    const db = await getMongoDb();
+    const doc = await db.collection('orders').findOne({
+      $or: [
+        { id: orderIdOrNumber },
+        { order_number: orderIdOrNumber },
+        { razorpay_order_id: orderIdOrNumber },
+      ],
+    });
+    if (!doc) return null;
+    const { items, ...order } = doc;
+    return { order, items: items || [] };
+  } catch (err) {
+    console.error('Error fetching order from MongoDB Atlas:', err);
+    return null;
+  }
+}
+
+export async function updateOrderInMongo(
+  orderId: string,
+  updates: Record<string, any>
+): Promise<boolean> {
+  try {
+    const db = await getMongoDb();
+    await db.collection('orders').updateOne(
+      { $or: [{ id: orderId }, { order_number: orderId }] },
+      {
+        $set: {
+          ...updates,
+          updated_at: new Date(),
+        },
+      }
+    );
+    return true;
+  } catch (err) {
+    console.error('Error updating order in MongoDB Atlas:', err);
+    return false;
+  }
+}
+
+export async function getUserOrdersFromMongo(userIdOrEmail: string): Promise<any[]> {
+  try {
+    const db = await getMongoDb();
+    const docs = await db
+      .collection('orders')
+      .find({
+        $or: [{ user_id: userIdOrEmail }, { customer_email: userIdOrEmail }],
+      })
+      .sort({ created_at: -1 })
+      .toArray();
+    return docs;
+  } catch (err) {
+    console.error('Error fetching user orders from MongoDB Atlas:', err);
+    return [];
+  }
+}
+

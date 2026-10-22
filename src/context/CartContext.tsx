@@ -37,17 +37,29 @@ const emptyCart: CartData = {
 
 export function saveCartToken(token: string, userId?: string | null): void {
   if (typeof window === 'undefined' || !token) return;
-  const key = userId ? `mv_cart_token_${userId}` : 'mv_cart_token_guest';
-  localStorage.setItem(key, token);
+  localStorage.setItem('mv_cart_token', token);
+  if (userId) {
+    localStorage.setItem(`mv_cart_token_${userId}`, token);
+  } else {
+    localStorage.setItem('mv_cart_token_guest', token);
+  }
 }
 
 export function getCartToken(userId?: string | null): string {
   if (typeof window === 'undefined') return '';
-  const key = userId ? `mv_cart_token_${userId}` : 'mv_cart_token_guest';
-  let token = localStorage.getItem(key);
+  // Check user token first, then shared/guest token to preserve items upon login
+  let token = userId ? localStorage.getItem(`mv_cart_token_${userId}`) : null;
+  if (!token) {
+    token = localStorage.getItem('mv_cart_token') || localStorage.getItem('mv_cart_token_guest');
+  }
   if (!token) {
     token = 'cart_' + (userId ? 'usr_' : 'gst_') + Math.random().toString(36).substring(2) + Date.now().toString(36);
-    localStorage.setItem(key, token);
+  }
+  localStorage.setItem('mv_cart_token', token);
+  if (userId) {
+    localStorage.setItem(`mv_cart_token_${userId}`, token);
+  } else {
+    localStorage.setItem('mv_cart_token_guest', token);
   }
   return token;
 }
@@ -85,7 +97,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       if (res.ok) {
         const data = await res.json();
-        // Administrators are strictly isolated from devotee carts
         setCart(data);
       }
     } catch (err) {
@@ -95,9 +106,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Re-synchronize and isolate cart whenever the active user changes (devotee logs in/out, admin logs in)
+  // Re-synchronize cart whenever the active user changes
   useEffect(() => {
-    setCart(emptyCart);
     setIsLoading(true);
     refreshCart();
   }, [user?.id, user?.role]);
@@ -108,6 +118,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const key = user ? `mv_cart_token_${user.id}` : 'mv_cart_token_guest';
       localStorage.removeItem(key);
       localStorage.removeItem('mv_cart_token');
+      localStorage.removeItem('mv_cart_token_guest');
     }
   };
 
