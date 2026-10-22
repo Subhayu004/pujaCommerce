@@ -319,7 +319,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
 
         const img = new Image();
         img.onload = async () => {
-          const maxDimension = 1200;
+          const maxDimension = 640;
           let width = img.width;
           let height = img.height;
 
@@ -339,7 +339,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
 
             try {
               const res = await safeFetchJson('/api/admin/upload-image', {

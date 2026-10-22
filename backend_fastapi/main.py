@@ -17,12 +17,13 @@ inventory_col = db["inventory"]
 pujas_col = db["pujas"]
 pujari_col = db["pujari"]
 
-# Exact models from user's model.py files
+# Exact models from user's model.py files with image/photo support
 class inventory(BaseModel):
     model_config = ConfigDict(extra="allow")
     title: str
     price: int
     des: str
+    image: Optional[str] = None
     is_available: bool = True
     stock: int = 10
     updated_at: Optional[datetime] = None
@@ -32,6 +33,7 @@ class pujas(BaseModel):
     title: str
     price: int
     des: str
+    image: Optional[str] = None
     is_available: Optional[bool] = True
     updated_at: Optional[datetime] = None
 
@@ -39,6 +41,7 @@ class pujari(BaseModel):
     model_config = ConfigDict(extra="allow")
     name: str
     des: str
+    photo: Optional[str] = None
     is_available: bool = True
     updated_at: Optional[datetime] = None
 

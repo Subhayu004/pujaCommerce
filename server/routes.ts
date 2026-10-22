@@ -526,17 +526,19 @@ export async function syncMongoItemsToDatabase(force = false) {
         const pricePaise = Math.round((Number(item.price) || 0) * 100);
         const stock = item.stock !== undefined ? Number(item.stock) : 25;
         const desc = item.des || 'Authentic ritual item stored in MongoDB Atlas.';
+        const image = item.image || item.photo || 'thali';
         const isActive = item.is_available === false ? 0 : 1;
-        const existing = db.prepare('SELECT id FROM products WHERE id = ?').get(id);
+        const existing = db.prepare('SELECT id, image FROM products WHERE id = ?').get(id) as any;
         if (existing) {
-          db.prepare('UPDATE products SET name = ?, price_paise = ?, stock = ?, description = ?, is_active = ? WHERE id = ?').run(
-            name, pricePaise, stock, desc, isActive, id
+          const finalImage = item.image || (existing.image && !existing.image.includes('photo-1616046229478-9901c5536a45') ? existing.image : image);
+          db.prepare('UPDATE products SET name = ?, price_paise = ?, stock = ?, description = ?, image = ?, is_active = ? WHERE id = ?').run(
+            name, pricePaise, stock, desc, finalImage, isActive, id
           );
         } else {
           db.prepare(`
             INSERT INTO products (id, name, slug, category, price_paise, stock, description, image, is_active, featured)
-            VALUES (?, ?, ?, 'Samagri Essentials', ?, ?, ?, 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=800&q=80', ?, 0)
-          `).run(id, name, 'mongo-prod-' + String(item._id), pricePaise, stock, desc, isActive);
+            VALUES (?, ?, ?, 'Samagri Essentials', ?, ?, ?, ?, ?, 0)
+          `).run(id, name, 'mongo-prod-' + String(item._id), pricePaise, stock, desc, image, isActive);
         }
       }
       // ONLY prune products if we have a valid array from MongoDB
@@ -558,17 +560,19 @@ export async function syncMongoItemsToDatabase(force = false) {
         const name = item.title || 'Vedic Ceremony';
         const pricePaise = Math.round((Number(item.price) || 0) * 100);
         const desc = item.des || 'Vedic puja ceremony recorded in MongoDB Atlas.';
+        const image = item.image || item.photo || 'rudra';
         const isActive = item.is_available === false ? 0 : 1;
-        const existing = db.prepare('SELECT id FROM pujas WHERE id = ?').get(id);
+        const existing = db.prepare('SELECT id, image FROM pujas WHERE id = ?').get(id) as any;
         if (existing) {
-          db.prepare('UPDATE pujas SET name = ?, price_paise = ?, description = ?, is_active = ? WHERE id = ?').run(
-            name, pricePaise, desc, isActive, id
+          const finalImage = item.image || (existing.image && !existing.image.includes('photo-1609342122563-a43ac8917a3a') ? existing.image : image);
+          db.prepare('UPDATE pujas SET name = ?, price_paise = ?, description = ?, image = ?, is_active = ? WHERE id = ?').run(
+            name, pricePaise, desc, finalImage, isActive, id
           );
         } else {
           db.prepare(`
             INSERT INTO pujas (id, name, slug, deity, duration_mins, price_paise, description, short_description, image, is_active, featured)
-            VALUES (?, ?, ?, 'General Vedic', 90, ?, ?, ?, 'https://images.unsplash.com/photo-1609342122563-a43ac8917a3a?auto=format&fit=crop&w=800&q=80', ?, 0)
-          `).run(id, name, 'mongo-puja-' + String(item._id), pricePaise, desc, desc.slice(0, 100), isActive);
+            VALUES (?, ?, ?, 'General Vedic', 90, ?, ?, ?, ?, ?, 0)
+          `).run(id, name, 'mongo-puja-' + String(item._id), pricePaise, desc, desc.slice(0, 100), image, isActive);
         }
       }
       // ONLY prune pujas if we have a valid array from MongoDB
@@ -589,17 +593,19 @@ export async function syncMongoItemsToDatabase(force = false) {
         validPujariIds.add(id);
         const name = item.name || 'Pandit Ji';
         const bio = item.des || 'Experienced Vedic Pandit registered in MongoDB Atlas.';
+        const photo = item.photo || item.image || 'acharyasharma';
         const isActive = item.is_available === false ? 0 : 1;
-        const existing = db.prepare('SELECT id FROM pujaris WHERE id = ?').get(id);
+        const existing = db.prepare('SELECT id, photo FROM pujaris WHERE id = ?').get(id) as any;
         if (existing) {
-          db.prepare('UPDATE pujaris SET name = ?, bio = ?, is_active = ? WHERE id = ?').run(
-            name, bio, isActive, id
+          const finalPhoto = item.photo || (existing.photo && !existing.photo.includes('photo-1545239351-ef35f43d514b') ? existing.photo : photo);
+          db.prepare('UPDATE pujaris SET name = ?, bio = ?, photo = ?, is_active = ? WHERE id = ?').run(
+            name, bio, finalPhoto, isActive, id
           );
         } else {
           db.prepare(`
             INSERT INTO pujaris (id, name, slug, photo, bio, experience_years, specializations, languages, service_areas, phone, email, is_active, rating, review_count)
-            VALUES (?, ?, ?, 'https://images.unsplash.com/photo-1545239351-ef35f43d514b?auto=format&fit=crop&w=800&q=80', ?, 10, 'Vedic Rituals, Homa, Sanskar', 'Sanskrit, Hindi, Bengali', 'Kolkata, Mumbai, Delhi', '+91 98765 43210', 'pandit@mandirveda.com', ?, 4.9, 21)
-          `).run(id, name, 'mongo-pujari-' + String(item._id), bio, isActive);
+            VALUES (?, ?, ?, ?, ?, 10, 'Vedic Rituals, Homa, Sanskar', 'Sanskrit, Hindi, Bengali', 'Kolkata, Mumbai, Delhi', '+91 98765 43210', 'pandit@mandirveda.com', ?, 4.9, 21)
+          `).run(id, name, 'mongo-pujari-' + String(item._id), photo, bio, isActive);
         }
       }
       // ONLY prune pujaris if we have a valid array from MongoDB
@@ -1631,6 +1637,7 @@ apiRouter.post('/admin/pujas', requireAdmin, async (req: AuthenticatedRequest, r
     title: data.name,
     price: priceRupees,
     des: description,
+    image,
     is_available: Boolean(data.is_active),
   });
 
@@ -1715,6 +1722,7 @@ apiRouter.put('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequest
       title: d.name ?? puja.name,
       price: Math.max(1, Math.round((d.price_paise ?? puja.price_paise) / 100)),
       des: d.description ?? d.short_description ?? puja.description,
+      image: d.image ?? puja.image,
       is_available: Boolean(d.is_active ?? puja.is_active),
     });
   }
@@ -1863,6 +1871,7 @@ apiRouter.post('/admin/products', requireAdmin, async (req: AuthenticatedRequest
     title: data.name,
     price: priceRupees,
     des: description,
+    image,
     is_available: Boolean(data.is_active),
     stock: data.stock || 20,
   });
@@ -1940,6 +1949,7 @@ apiRouter.put('/admin/products/:id', requireAdmin, async (req: AuthenticatedRequ
       title: d.name ?? product.name,
       price: Math.max(1, Math.round((d.price_paise ?? product.price_paise) / 100)),
       des: d.description ?? product.description,
+      image: d.image ?? product.image,
       is_available: Boolean(d.is_active ?? product.is_active),
       stock: d.stock ?? product.stock ?? 20,
     });
@@ -2206,6 +2216,7 @@ apiRouter.post('/admin/pujaris', requireAdmin, async (req: AuthenticatedRequest,
   const mongoId = await createPujariInMongo({
     name: d.name,
     des: bio,
+    photo,
     is_available: Boolean(d.is_active),
   });
 
@@ -2290,6 +2301,7 @@ apiRouter.put('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedReque
     await updatePujariInMongo(mongoId, {
       name: d.name ?? pujari.name,
       des: d.bio ?? pujari.bio,
+      photo: d.photo ?? pujari.photo,
       is_available: Boolean(d.is_active ?? pujari.is_active),
     });
   }
@@ -2403,41 +2415,14 @@ apiRouter.delete('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedRe
 // ==========================================
 apiRouter.post('/admin/upload-image', requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { dataUrl, filename } = req.body;
+    const { dataUrl } = req.body;
     if (!dataUrl || typeof dataUrl !== 'string') {
       return res.status(400).json({ error: 'Image data URL is required' });
     }
 
-    const match = dataUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
-    if (match) {
-      let ext = match[1].toLowerCase();
-      if (ext === 'jpeg') ext = 'jpg';
-      if (process.env.VERCEL) {
-        // On Vercel serverless filesystem is read-only, store dataUrl directly
-        return res.json({ success: true, url: dataUrl });
-      }
-      const buffer = Buffer.from(match[2], 'base64');
-      const safeName = `img_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
-      const uploadsDir = path.resolve(process.cwd(), 'uploads');
-      const publicUploadsDir = path.resolve(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-      if (!fs.existsSync(publicUploadsDir)) {
-        fs.mkdirSync(publicUploadsDir, { recursive: true });
-      }
-      const filePath = path.join(uploadsDir, safeName);
-      const publicFilePath = path.join(publicUploadsDir, safeName);
-      fs.writeFileSync(filePath, buffer);
-      try {
-        fs.writeFileSync(publicFilePath, buffer);
-      } catch {
-        // ignore
-      }
-      return res.json({ success: true, url: `/uploads/${safeName}` });
-    }
-
-    // If it's already a URL
+    // Return the optimized data URL so it gets saved directly to MongoDB Atlas.
+    // This guarantees the image permanently persists across Vercel serverless cold-starts,
+    // cross-device sessions, and eliminates 404s and flickering.
     return res.json({ success: true, url: dataUrl });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Image upload failed' });

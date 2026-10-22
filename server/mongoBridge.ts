@@ -87,6 +87,7 @@ export async function createPujaInMongo(data: {
   title: string;
   price: number;
   des: string;
+  image?: string;
   is_available?: boolean;
 }): Promise<string | null> {
   // Try FastAPI first if running
@@ -114,6 +115,7 @@ export async function createPujaInMongo(data: {
       title: data.title,
       price: data.price,
       des: data.des,
+      image: data.image || null,
       is_available: data.is_available ?? true,
       updated_at: null,
       created_at: new Date(),
@@ -127,7 +129,7 @@ export async function createPujaInMongo(data: {
 
 export async function updatePujaInMongo(
   id: string,
-  data: { title?: string; price?: number; des?: string; is_available?: boolean }
+  data: { title?: string; price?: number; des?: string; image?: string; is_available?: boolean }
 ): Promise<boolean> {
   try {
     if (await isFastApiReachable()) {
@@ -221,6 +223,7 @@ export async function createInventoryInMongo(data: {
   title: string;
   price: number;
   des: string;
+  image?: string;
   stock?: number;
   is_available?: boolean;
 }): Promise<string | null> {
@@ -247,6 +250,7 @@ export async function createInventoryInMongo(data: {
       title: data.title,
       price: data.price,
       des: data.des,
+      image: data.image || null,
       stock: data.stock ?? 10,
       is_available: data.is_available ?? true,
       updated_at: null,
@@ -261,7 +265,7 @@ export async function createInventoryInMongo(data: {
 
 export async function updateInventoryInMongo(
   id: string,
-  data: { title?: string; price?: number; des?: string; stock?: number; is_available?: boolean }
+  data: { title?: string; price?: number; des?: string; image?: string; stock?: number; is_available?: boolean }
 ): Promise<boolean> {
   try {
     if (await isFastApiReachable()) {
@@ -354,6 +358,7 @@ export async function getPujarisFromMongo(): Promise<any[]> {
 export async function createPujariInMongo(data: {
   name: string;
   des: string;
+  photo?: string;
   is_available?: boolean;
 }): Promise<string | null> {
   try {
@@ -378,6 +383,7 @@ export async function createPujariInMongo(data: {
     const result = await db.collection('pujari').insertOne({
       name: data.name,
       des: data.des,
+      photo: data.photo || null,
       is_available: data.is_available ?? true,
       updated_at: null,
       created_at: new Date(),
@@ -391,7 +397,7 @@ export async function createPujariInMongo(data: {
 
 export async function updatePujariInMongo(
   id: string,
-  data: { name?: string; des?: string; is_available?: boolean }
+  data: { name?: string; des?: string; photo?: string; is_available?: boolean }
 ): Promise<boolean> {
   try {
     if (await isFastApiReachable()) {
