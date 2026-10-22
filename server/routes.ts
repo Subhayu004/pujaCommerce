@@ -466,9 +466,107 @@ apiRouter.get('/auth/me', (req: AuthenticatedRequest, res: Response) => {
 });
 
 // ==========================================
-// 2. PUJA CATALOG ROUTES
+// 2. PUJA CATALOG ROUTES & MONGODB SYNC
 // ==========================================
-apiRouter.get('/pujas', (req: Request, res: Response) => {
+let lastMongoSync = 0;
+export async function syncMongoItemsToDatabase(force = false) {
+  const now = Date.now();
+  if (!force && now - lastMongoSync < 4000) {
+    return;
+  }
+  lastMongoSync = now;
+  try {
+    const [pujasRes, invRes, pujariRes] = await Promise.all([
+      fetch('http://127.0.0.1:8001/pujas', { signal: AbortSignal.timeout(1000) }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('http://127.0.0.1:8001/inventory', { signal: AbortSignal.timeout(1000) }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('http://127.0.0.1:8001/pujari', { signal: AbortSignal.timeout(1000) }).then(r => r.ok ? r.json() : []).catch(() => []),
+    ]);
+
+    // Sync Inventory to Products
+    if (Array.isArray(invRes)) {
+      for (const item of invRes) {
+        if (!item._id) continue;
+        const id = 'mongo_inv_' + String(item._id);
+        const name = item.title || 'Sacred Samagri';
+        const pricePaise = Math.round((Number(item.price) || 0) * 100);
+        const stock = item.stock !== undefined ? Number(item.stock) : 25;
+        const desc = item.des || 'Authentic ritual item stored in MongoDB Atlas.';
+        const isActive = item.is_available === false ? 0 : 1;
+        const existing = db.prepare('SELECT id FROM products WHERE id = ?').get(id);
+        if (existing) {
+          db.prepare('UPDATE products SET name = ?, price_paise = ?, stock = ?, description = ?, is_active = ? WHERE id = ?').run(
+            name, pricePaise, stock, desc, isActive, id
+          );
+        } else {
+          db.prepare(`
+            INSERT INTO products (id, name, slug, category, price_paise, stock, description, image, is_active, featured)
+            VALUES (?, ?, ?, 'Samagri Essentials', ?, ?, ?, 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=800&q=80', ?, 0)
+          `).run(id, name, 'mongo-prod-' + String(item._id), pricePaise, stock, desc, isActive);
+        }
+      }
+    }
+
+    // Sync Pujas
+    if (Array.isArray(pujasRes)) {
+      for (const item of pujasRes) {
+        if (!item._id) continue;
+        const id = 'mongo_puja_' + String(item._id);
+        const name = item.title || 'Vedic Ceremony';
+        const pricePaise = Math.round((Number(item.price) || 0) * 100);
+        const desc = item.des || 'Vedic puja ceremony recorded in MongoDB Atlas.';
+        const isActive = item.is_available === false ? 0 : 1;
+        const existing = db.prepare('SELECT id FROM pujas WHERE id = ?').get(id);
+        if (existing) {
+          db.prepare('UPDATE pujas SET name = ?, price_paise = ?, description = ?, is_active = ? WHERE id = ?').run(
+            name, pricePaise, desc, isActive, id
+          );
+        } else {
+          db.prepare(`
+            INSERT INTO pujas (id, name, slug, deity, duration_mins, price_paise, description, short_description, image, is_active, featured)
+            VALUES (?, ?, ?, 'General Vedic', 90, ?, ?, ?, 'https://images.unsplash.com/photo-1609342122563-a43ac8917a3a?auto=format&fit=crop&w=800&q=80', ?, 0)
+          `).run(id, name, 'mongo-puja-' + String(item._id), pricePaise, desc, desc.slice(0, 100), isActive);
+        }
+      }
+    }
+
+    // Sync Pujaris
+    if (Array.isArray(pujariRes)) {
+      for (const item of pujariRes) {
+        if (!item._id) continue;
+        const id = 'mongo_pujari_' + String(item._id);
+        const name = item.name || 'Pandit Ji';
+        const bio = item.des || 'Experienced Vedic Pandit registered in MongoDB Atlas.';
+        const isActive = item.is_available === false ? 0 : 1;
+        const existing = db.prepare('SELECT id FROM pujaris WHERE id = ?').get(id);
+        if (existing) {
+          db.prepare('UPDATE pujaris SET name = ?, bio = ?, is_active = ? WHERE id = ?').run(
+            name, bio, isActive, id
+          );
+        } else {
+          db.prepare(`
+            INSERT INTO pujaris (id, name, slug, photo, bio, experience_years, specializations, languages, service_areas, phone, email, is_active, rating, review_count)
+            VALUES (?, ?, ?, 'https://images.unsplash.com/photo-1545239351-ef35f43d514b?auto=format&fit=crop&w=800&q=80', ?, 10, 'Vedic Rituals, Homa, Sanskar', 'Sanskrit, Hindi, Bengali', 'Kolkata, Mumbai, Delhi', '+91 98765 43210', 'pandit@mandirveda.com', ?, 4.9, 21)
+          `).run(id, name, 'mongo-pujari-' + String(item._id), bio, isActive);
+        }
+      }
+    }
+  } catch (err) {
+    // Ignore transient failures if FastAPI is momentarily booting
+  }
+}
+
+// Initial sync and periodic background sync every 15s
+setTimeout(() => { syncMongoItemsToDatabase(true); }, 2000);
+setInterval(() => { syncMongoItemsToDatabase(); }, 15000);
+
+// Endpoint to trigger instant catalog refresh from MongoDB
+apiRouter.post('/sync-mongo', async (_req: Request, res: Response) => {
+  await syncMongoItemsToDatabase(true);
+  return res.json({ success: true, message: 'MongoDB items synced to catalog.' });
+});
+
+apiRouter.get('/pujas', async (req: Request, res: Response) => {
+  await syncMongoItemsToDatabase();
   const { search, deity, sort } = req.query;
 
   let query = "SELECT * FROM pujas WHERE (is_active = 1 OR is_active IS NULL OR is_active = '1' OR is_active != 0)";
@@ -545,7 +643,8 @@ apiRouter.post('/pujas/check-availability', (req: Request, res: Response) => {
 // ==========================================
 // 3. PUJARI DIRECTORY ROUTES
 // ==========================================
-apiRouter.get('/pujaris', (req: Request, res: Response) => {
+apiRouter.get('/pujaris', async (req: Request, res: Response) => {
+  await syncMongoItemsToDatabase();
   const { search, language, specialization } = req.query;
 
   let query = "SELECT * FROM pujaris WHERE (is_active = 1 OR is_active IS NULL OR is_active = '1' OR is_active != 0)";
@@ -583,7 +682,8 @@ apiRouter.get('/pujaris/:slug', (req: Request, res: Response) => {
 // ==========================================
 // 4. PUJA SHOP PRODUCTS ROUTES
 // ==========================================
-apiRouter.get('/products', (req: Request, res: Response) => {
+apiRouter.get('/products', async (req: Request, res: Response) => {
+  await syncMongoItemsToDatabase();
   const { category, search, sort } = req.query;
 
   let query = "SELECT * FROM products WHERE (is_active = 1 OR is_active IS NULL OR is_active = '1' OR is_active != 0)";

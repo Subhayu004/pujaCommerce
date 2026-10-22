@@ -2,6 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import { initDatabase } from './server/db.js';
 import { authMiddleware } from './server/auth.js';
 import { apiRouter } from './server/routes.js';
@@ -19,6 +20,56 @@ async function startServer() {
   app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
   app.use(cookieParser());
   app.use(authMiddleware);
+
+  // Start FastAPI & MongoDB backend on internal port 8001 if not already running
+  try {
+    const fastApiDir = path.resolve(__dirname, 'fastapi_backend');
+    fetch('http://127.0.0.1:8001/health').catch(() => {
+      const proc = spawn('python3', [
+        '-m', 'uvicorn',
+        'main:app',
+        '--app-dir', fastApiDir,
+        '--host', '0.0.0.0',
+        '--port', '8001'
+      ], { stdio: 'inherit', detached: false });
+      proc.on('error', (err) => console.error('[FastAPI Warning]:', err));
+    });
+  } catch (e) {
+    console.error('[FastAPI Spawn Warning]:', e);
+  }
+
+  // Proxy to FastAPI & MongoDB service on port 8001
+  app.all(['/api/fastapi/*', '/fastapi/*', '/api/fastapi', '/fastapi'], async (req, res) => {
+    const targetPath = req.url.replace(/^\/api\/fastapi/, '').replace(/^\/fastapi/, '');
+    const targetUrl = `http://127.0.0.1:8001${targetPath || '/'}`;
+    try {
+      const fetchInit: RequestInit = {
+        method: req.method,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': req.headers['content-type'] || 'application/json',
+        },
+      };
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+        fetchInit.body = JSON.stringify(req.body);
+      }
+      const response = await fetch(targetUrl, fetchInit);
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        return res.status(response.status).json(data);
+      } else {
+        const text = await response.text();
+        return res.status(response.status).send(text);
+      }
+    } catch (err: any) {
+      return res.status(502).json({
+        error: 'FastAPI Backend unreachable',
+        details: err.message,
+        targetUrl,
+      });
+    }
+  });
 
   // Mount API endpoints
   app.use('/api', apiRouter);
