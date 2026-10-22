@@ -1677,7 +1677,7 @@ apiRouter.post('/admin/pujas', requireAdmin, async (req: AuthenticatedRequest, r
   );
 
   const created = db.prepare('SELECT * FROM pujas WHERE id = ?').get(pujaId);
-  return res.status(201).json({ success: true, puja: created, message: 'Puja created and saved to MongoDB Atlas successfully' });
+  return res.status(201).json({ success: true, puja: created, message: 'Puja ritual created successfully' });
 });
 
 apiRouter.put('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -1768,11 +1768,11 @@ apiRouter.put('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequest
     req.user!.id,
     req.user!.email,
     id,
-    `Updated Puja in MongoDB: ${d.name ?? puja.name}`
+    `Updated Puja: ${d.name ?? puja.name}`
   );
 
   const updated = db.prepare('SELECT * FROM pujas WHERE id = ?').get(id);
-  return res.json({ success: true, puja: updated, message: 'Puja updated successfully in MongoDB Atlas' });
+  return res.json({ success: true, puja: updated, message: 'Puja ritual updated successfully' });
 });
 
 apiRouter.delete('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -1836,10 +1836,10 @@ apiRouter.delete('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequ
     req.user!.id,
     req.user!.email,
     id,
-    `Deleted Puja from MongoDB: ${puja.name}`
+    `Deleted Puja: ${puja.name}`
   );
 
-  return res.json({ success: true, message: `Puja ${puja.name} deleted successfully from MongoDB Atlas` });
+  return res.json({ success: true, message: `Puja ${puja.name} deleted successfully` });
 });
 
 // ==========================================
@@ -1935,7 +1935,7 @@ apiRouter.post('/admin/products', requireAdmin, async (req: AuthenticatedRequest
   );
 
   const created = db.prepare('SELECT * FROM products WHERE id = ?').get(prodId);
-  return res.status(201).json({ success: true, product: created, message: 'Puja essential created and saved to MongoDB Atlas successfully' });
+  return res.status(201).json({ success: true, product: created, message: 'Puja essential created successfully' });
 });
 
 apiRouter.put('/admin/products/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -2018,11 +2018,11 @@ apiRouter.put('/admin/products/:id', requireAdmin, async (req: AuthenticatedRequ
     req.user!.id,
     req.user!.email,
     id,
-    `Updated Product in MongoDB: ${product.name} (Stock: ${d.stock ?? product.stock}, Price: ₹${(d.price_paise ?? product.price_paise) / 100})`
+    `Updated Product: ${product.name} (Stock: ${d.stock ?? product.stock}, Price: ₹${(d.price_paise ?? product.price_paise) / 100})`
   );
 
   const updated = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-  return res.json({ success: true, product: updated, message: 'Puja essential updated successfully in MongoDB Atlas' });
+  return res.json({ success: true, product: updated, message: 'Puja essential updated successfully' });
 });
 
 apiRouter.delete('/admin/products/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -2086,10 +2086,10 @@ apiRouter.delete('/admin/products/:id', requireAdmin, async (req: AuthenticatedR
     req.user!.id,
     req.user!.email,
     id,
-    `Deleted Product from MongoDB: ${product.name}`
+    `Deleted Product: ${product.name}`
   );
 
-  return res.json({ success: true, message: `Product ${product.name} deleted successfully from MongoDB Atlas` });
+  return res.json({ success: true, message: `Product ${product.name} deleted successfully` });
 });
 
 // Admin Product Inventory Quick Stock Update
@@ -2308,11 +2308,11 @@ apiRouter.post('/admin/pujaris', requireAdmin, async (req: AuthenticatedRequest,
     req.user!.id,
     req.user!.email,
     pujariId,
-    `Added Acharya in MongoDB: ${d.name} (${d.experience_years} yrs exp, ${d.specializations})`
+    `Added Acharya: ${d.name} (${d.experience_years} yrs exp, ${d.specializations})`
   );
 
   const created = db.prepare('SELECT * FROM pujaris WHERE id = ?').get(pujariId);
-  return res.status(201).json({ success: true, pujari: created, message: 'Acharya profile created and saved to MongoDB Atlas successfully' });
+  return res.status(201).json({ success: true, pujari: created, message: 'Acharya profile created successfully' });
 });
 
 apiRouter.put('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -2405,11 +2405,11 @@ apiRouter.put('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedReque
     req.user!.id,
     req.user!.email,
     id,
-    `Updated Acharya profile in MongoDB: ${d.name ?? pujari.name}`
+    `Updated Acharya profile: ${d.name ?? pujari.name}`
   );
 
   const updated = db.prepare('SELECT * FROM pujaris WHERE id = ?').get(id);
-  return res.json({ success: true, pujari: updated, message: 'Acharya profile updated successfully in MongoDB Atlas' });
+  return res.json({ success: true, pujari: updated, message: 'Acharya profile updated successfully' });
 });
 
 apiRouter.delete('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
@@ -2468,10 +2468,10 @@ apiRouter.delete('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedRe
     req.user!.id,
     req.user!.email,
     id,
-    `Deleted Acharya profile from MongoDB: ${pujari.name}`
+    `Deleted Acharya profile: ${pujari.name}`
   );
 
-  return res.json({ success: true, message: `Acharya ${pujari.name} deleted successfully from MongoDB Atlas` });
+  return res.json({ success: true, message: `Acharya ${pujari.name} deleted successfully` });
 });
 
 // ==========================================

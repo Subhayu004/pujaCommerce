@@ -9,6 +9,7 @@ app = FastAPI()
 router = APIRouter()
 
 
+@router.get("")
 @router.get("/")
 async def get_items():
     try:
@@ -27,6 +28,7 @@ async def get_items():
         )
 
 
+@router.post("")
 @router.post("/")
 async def create_items(items: pujari):
     try:

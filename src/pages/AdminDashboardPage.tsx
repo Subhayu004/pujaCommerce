@@ -48,7 +48,6 @@ import {
   LakshmiKuberArt,
   PujariAvatar,
 } from '../components/SpiritualArt';
-import { FastApiMongoConsole } from '../components/FastApiMongoConsole';
 
 interface AdminDashboardPageProps {
   onNavigate: (route: string) => void;
@@ -78,20 +77,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const [adminPassword, setAdminPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [showDirectFastApi, setShowDirectFastApi] = useState(false);
 
   // Tabs - restore from localStorage if user was previously viewing a tab
-  const [activeTab, setActiveTabState] = useState<'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security' | 'fastapi'>(() => {
+  const [activeTab, setActiveTabState] = useState<'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security'>(() => {
     try {
       const saved = localStorage.getItem('pujasathi_admin_active_tab') as any;
-      if (['overview', 'bookings', 'pujas', 'products', 'pujaris', 'security', 'fastapi'].includes(saved)) {
+      if (['overview', 'bookings', 'pujas', 'products', 'pujaris', 'security'].includes(saved)) {
         return saved;
       }
     } catch {}
     return 'bookings';
   });
 
-  const setActiveTab = (tab: 'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security' | 'fastapi') => {
+  const setActiveTab = (tab: 'overview' | 'bookings' | 'pujas' | 'products' | 'pujaris' | 'security') => {
     setActiveTabState(tab);
     try {
       localStorage.setItem('pujasathi_admin_active_tab', tab);
@@ -1273,39 +1271,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     );
   }
 
-  // Allow direct access to FastAPI & MongoDB Console without credentials
-  if (showDirectFastApi) {
-    return (
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#064E3B] text-white rounded-2xl p-5 sm:p-6 shadow-md border border-emerald-700">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-emerald-800/80 border border-emerald-500/40 flex items-center justify-center shrink-0">
-              <Database className="w-6 h-6 text-emerald-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold font-heading">FastAPI & MongoDB Atlas Control Center</h1>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/30 text-emerald-200 border border-emerald-400/40">
-                  ⚡ Live Connected
-                </span>
-              </div>
-              <p className="text-xs text-emerald-200 mt-0.5">
-                Full CRUD control directly linked to MongoDB Atlas database <code className="bg-black/30 px-1 py-0.5 rounded">puja</code>
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowDirectFastApi(false)}
-            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto border border-white/20 shadow-xs"
-          >
-            ← Back to Admin Login
-          </button>
-        </div>
-        <FastApiMongoConsole onCatalogRefresh={loadAdminData} />
-      </div>
-    );
-  }
-
   // If not logged in as Admin, show strictly protected login screen
   if (!user || user.role !== 'admin') {
     return (
@@ -1368,18 +1333,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               <span>Sign In to Admin Portal</span>
             </button>
           </form>
-
-          {/* Direct FastAPI & MongoDB console shortcut button */}
-          <div className="mt-4 pt-3 border-t border-[#E7DCCE]/80">
-            <button
-              type="button"
-              onClick={() => setShowDirectFastApi(true)}
-              className="w-full py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm border border-emerald-700"
-            >
-              <Database className="w-4 h-4 text-emerald-300" />
-              <span>⚡ Direct FastAPI & MongoDB Atlas Console</span>
-            </button>
-          </div>
 
           <div className="mt-4 pt-3 border-t border-[#E7DCCE]/80 space-y-2">
             <p className="text-[11px] font-semibold text-[#78716C] text-center mb-1">
@@ -1550,18 +1503,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         >
           <ShieldCheck className="w-4 h-4" />
           <span>Anti-Hack Shield & Security</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('fastapi')}
-          className={`px-3.5 sm:px-4 py-2 rounded-xl transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
-            activeTab === 'fastapi'
-              ? 'bg-emerald-800 text-white shadow-xs'
-              : 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100 border border-emerald-300'
-          }`}
-        >
-          <Database className="w-4 h-4 text-emerald-600" />
-          <span>FastAPI & MongoDB ⚡</span>
         </button>
       </div>
 
@@ -2349,13 +2290,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             </div>
           </div>
         </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 6: FASTAPI & MONGODB BACKEND LIVE CRUD CONSOLE */}
-      {/* ======================================================== */}
-      {activeTab === 'fastapi' && (
-        <FastApiMongoConsole onCatalogRefresh={loadAdminData} />
       )}
 
       {/* ======================================================== */}

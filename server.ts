@@ -23,7 +23,7 @@ async function startServer() {
 
   // Start FastAPI & MongoDB backend on internal port 8001 if not already running
   try {
-    const fastApiDir = path.resolve(__dirname, 'fastapi_backend');
+    const fastApiDir = path.resolve(__dirname, 'backend_fastapi');
     fetch('http://127.0.0.1:8001/health').catch(() => {
       const proc = spawn('python3', [
         '-m', 'uvicorn',

@@ -151,7 +151,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-10 text-center">
             <Flame className="w-8 h-8 text-[#D97706] mx-auto mb-2 opacity-60" />
             <p className="text-sm font-semibold text-[#292524]">No Pujas Listed Yet</p>
-            <p className="text-xs text-[#78716C] mt-1">Temple administrators can add ceremonies via the Admin Portal or FastAPI & MongoDB Console.</p>
+            <p className="text-xs text-[#78716C] mt-1">Temple administrators can add ceremonies via the Admin Portal.</p>
             <button
               onClick={() => onNavigate('/admin')}
               className="mt-4 px-4 py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
@@ -201,7 +201,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-10 text-center">
             <ShoppingBag className="w-8 h-8 text-[#9A3412] mx-auto mb-2 opacity-60" />
             <p className="text-sm font-semibold text-[#292524]">No Samagri Listed Yet</p>
-            <p className="text-xs text-[#78716C] mt-1">Temple administrators can add inventory via the Admin Portal or FastAPI & MongoDB Console.</p>
+            <p className="text-xs text-[#78716C] mt-1">Temple administrators can add inventory via the Admin Portal.</p>
             <button
               onClick={() => onNavigate('/admin')}
               className="mt-4 px-4 py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
@@ -250,7 +250,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="bg-[#FAF7F2] border border-[#E7DCCE] rounded-2xl p-8 sm:p-10 text-center">
             <Users className="w-8 h-8 text-[#B45309] mx-auto mb-2 opacity-60" />
             <p className="text-sm font-semibold text-[#292524]">No Pujaris Registered Yet</p>
-            <p className="text-xs text-[#78716C] mt-1">Add priest profiles via the Admin Portal or FastAPI & MongoDB Console.</p>
+            <p className="text-xs text-[#78716C] mt-1">Add priest profiles via the Admin Portal.</p>
             <button
               onClick={() => onNavigate('/admin')}
               className="mt-4 px-4 py-2 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
