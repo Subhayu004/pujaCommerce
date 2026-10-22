@@ -216,6 +216,23 @@ export const FastApiMongoConsole: React.FC<FastApiMongoConsoleProps> = () => {
       setEditingItem(null);
       loadCollectionData();
       checkHealth();
+
+      // Immediately trigger catalog sync & notify dev server and devotee UI
+      try {
+        await fetch('/api/sync-mongo', { method: 'POST' });
+      } catch {}
+
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          const bc = new BroadcastChannel('pujasathi_catalog_channel');
+          bc.postMessage('catalog_updated');
+          setTimeout(() => { bc.close(); }, 150);
+        } catch {}
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: modalType } }));
+      }
     } catch (err: any) {
       setModalError(err.message || 'Failed to save to MongoDB via FastAPI');
     } finally {
@@ -237,6 +254,23 @@ export const FastApiMongoConsole: React.FC<FastApiMongoConsoleProps> = () => {
       setTimeout(() => setActionSuccess(''), 4000);
       loadCollectionData();
       checkHealth();
+
+      // Immediately sync catalog
+      try {
+        await fetch('/api/sync-mongo', { method: 'POST' });
+      } catch {}
+
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          const bc = new BroadcastChannel('pujasathi_catalog_channel');
+          bc.postMessage('catalog_updated');
+          setTimeout(() => { bc.close(); }, 150);
+        } catch {}
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('catalogUpdated', { detail: { type: type === 'pujas' ? 'puja_delete' : type === 'inventory' ? 'product_delete' : 'pujari_delete', id } }));
+      }
     } catch (err: any) {
       setDataError(err.message || 'Error deleting item from MongoDB');
       setTimeout(() => setDataError(''), 4000);

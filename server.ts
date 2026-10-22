@@ -45,6 +45,7 @@ async function startServer() {
     try {
       const fetchInit: RequestInit = {
         method: req.method,
+        redirect: 'follow',
         headers: {
           'Accept': 'application/json',
           'Content-Type': req.headers['content-type'] || 'application/json',

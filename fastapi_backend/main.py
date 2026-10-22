@@ -15,7 +15,8 @@ from schemas import (
 app = FastAPI(
     title="PujaSathi FastAPI & MongoDB Backend",
     description="Unified FastAPI service connecting to MongoDB Atlas for Pujas, Inventory, and Pujari management.",
-    version="1.0.0"
+    version="1.0.0",
+    redirect_slashes=False
 )
 
 # Enable CORS for all origins
@@ -71,6 +72,7 @@ async def health_check():
 # ========================================================
 inventory_router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
+@inventory_router.get("")
 @inventory_router.get("/")
 async def get_all_inventory():
     try:
@@ -84,6 +86,7 @@ async def get_all_inventory():
     except Exception as e:
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
+@inventory_router.post("")
 @inventory_router.post("/")
 async def create_inventory(item: InventoryItem):
     try:
@@ -103,6 +106,7 @@ async def create_inventory(item: InventoryItem):
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
 @inventory_router.put("/{item_id}")
+@inventory_router.put("/{item_id}/")
 async def update_inventory(item_id: str, updated_item: InventoryItem):
     try:
         _, col, _, _ = get_database()
@@ -124,6 +128,7 @@ async def update_inventory(item_id: str, updated_item: InventoryItem):
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
 @inventory_router.delete("/{item_id}")
+@inventory_router.delete("/{item_id}/")
 async def delete_inventory(item_id: str):
     try:
         _, col, _, _ = get_database()
@@ -147,6 +152,7 @@ async def delete_inventory(item_id: str):
 # ========================================================
 pujas_router = APIRouter(prefix="/pujas", tags=["Pujas"])
 
+@pujas_router.get("")
 @pujas_router.get("/")
 async def get_all_pujas():
     try:
@@ -160,6 +166,7 @@ async def get_all_pujas():
     except Exception as e:
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
+@pujas_router.post("")
 @pujas_router.post("/")
 async def create_puja(item: PujaItem):
     try:
@@ -179,6 +186,7 @@ async def create_puja(item: PujaItem):
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
 @pujas_router.put("/{item_id}")
+@pujas_router.put("/{item_id}/")
 async def update_puja(item_id: str, updated_item: PujaItem):
     try:
         _, _, col, _ = get_database()
@@ -200,6 +208,7 @@ async def update_puja(item_id: str, updated_item: PujaItem):
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
 @pujas_router.delete("/{item_id}")
+@pujas_router.delete("/{item_id}/")
 async def delete_puja(item_id: str):
     try:
         _, _, col, _ = get_database()
@@ -223,6 +232,7 @@ async def delete_puja(item_id: str):
 # ========================================================
 pujari_router = APIRouter(prefix="/pujari", tags=["Pujari"])
 
+@pujari_router.get("")
 @pujari_router.get("/")
 async def get_all_pujaris():
     try:
@@ -236,6 +246,7 @@ async def get_all_pujaris():
     except Exception as e:
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
+@pujari_router.post("")
 @pujari_router.post("/")
 async def create_pujari(item: PujariItem):
     try:
@@ -255,6 +266,7 @@ async def create_pujari(item: PujariItem):
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
 @pujari_router.put("/{item_id}")
+@pujari_router.put("/{item_id}/")
 async def update_pujari(item_id: str, updated_item: PujariItem):
     try:
         _, _, _, col = get_database()
@@ -276,6 +288,7 @@ async def update_pujari(item_id: str, updated_item: PujariItem):
         raise HTTPException(status_code=500, detail=check_mongo_error(e))
 
 @pujari_router.delete("/{item_id}")
+@pujari_router.delete("/{item_id}/")
 async def delete_pujari(item_id: str):
     try:
         _, _, _, col = get_database()
