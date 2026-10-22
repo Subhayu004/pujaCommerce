@@ -14,6 +14,20 @@ import {
   isUserAdmin,
 } from './auth.js';
 import { generateOrderReceiptPDF, OrderReceiptData } from './receipt.js';
+import {
+  getPujasFromMongo,
+  getInventoryFromMongo,
+  getPujarisFromMongo,
+  createPujaInMongo,
+  updatePujaInMongo,
+  deletePujaFromMongo,
+  createInventoryInMongo,
+  updateInventoryInMongo,
+  deleteInventoryFromMongo,
+  createPujariInMongo,
+  updatePujariInMongo,
+  deletePujariFromMongo,
+} from './mongoBridge.js';
 
 export const apiRouter = Router();
 
@@ -495,16 +509,16 @@ export async function syncMongoItemsToDatabase(force = false) {
   }
   lastMongoSync = now;
   try {
-    const [pujasResult, invResult, pujariResult] = await Promise.all([
-      fetchFromFastApi('http://127.0.0.1:8001/pujas/'),
-      fetchFromFastApi('http://127.0.0.1:8001/inventory/'),
-      fetchFromFastApi('http://127.0.0.1:8001/pujari/'),
+    const [pujasData, invData, pujariData] = await Promise.all([
+      getPujasFromMongo(),
+      getInventoryFromMongo(),
+      getPujarisFromMongo(),
     ]);
 
     // 1. Sync Inventory to Products
-    if (invResult.ok) {
+    if (Array.isArray(invData)) {
       const validInvIds = new Set<string>();
-      for (const item of invResult.data) {
+      for (const item of invData) {
         if (!item._id) continue;
         const id = 'mongo_inv_' + String(item._id);
         validInvIds.add(id);
@@ -525,7 +539,7 @@ export async function syncMongoItemsToDatabase(force = false) {
           `).run(id, name, 'mongo-prod-' + String(item._id), pricePaise, stock, desc, isActive);
         }
       }
-      // ONLY prune products if the MongoDB fetch was verified OK
+      // ONLY prune products if we have a valid array from MongoDB
       const existingSqliteProducts = db.prepare("SELECT id FROM products WHERE id LIKE 'mongo_inv_%'").all() as { id: string }[];
       for (const p of existingSqliteProducts) {
         if (!validInvIds.has(p.id)) {
@@ -535,9 +549,9 @@ export async function syncMongoItemsToDatabase(force = false) {
     }
 
     // 2. Sync Pujas
-    if (pujasResult.ok) {
+    if (Array.isArray(pujasData)) {
       const validPujaIds = new Set<string>();
-      for (const item of pujasResult.data) {
+      for (const item of pujasData) {
         if (!item._id) continue;
         const id = 'mongo_puja_' + String(item._id);
         validPujaIds.add(id);
@@ -557,7 +571,7 @@ export async function syncMongoItemsToDatabase(force = false) {
           `).run(id, name, 'mongo-puja-' + String(item._id), pricePaise, desc, desc.slice(0, 100), isActive);
         }
       }
-      // ONLY prune pujas if the MongoDB fetch was verified OK
+      // ONLY prune pujas if we have a valid array from MongoDB
       const existingSqlitePujas = db.prepare("SELECT id FROM pujas WHERE id LIKE 'mongo_puja_%'").all() as { id: string }[];
       for (const p of existingSqlitePujas) {
         if (!validPujaIds.has(p.id)) {
@@ -567,9 +581,9 @@ export async function syncMongoItemsToDatabase(force = false) {
     }
 
     // 3. Sync Pujaris
-    if (pujariResult.ok) {
+    if (Array.isArray(pujariData)) {
       const validPujariIds = new Set<string>();
-      for (const item of pujariResult.data) {
+      for (const item of pujariData) {
         if (!item._id) continue;
         const id = 'mongo_pujari_' + String(item._id);
         validPujariIds.add(id);
@@ -588,7 +602,7 @@ export async function syncMongoItemsToDatabase(force = false) {
           `).run(id, name, 'mongo-pujari-' + String(item._id), bio, isActive);
         }
       }
-      // ONLY prune pujaris if the MongoDB fetch was verified OK
+      // ONLY prune pujaris if we have a valid array from MongoDB
       const existingSqlitePujaris = db.prepare("SELECT id FROM pujaris WHERE id LIKE 'mongo_pujari_%'").all() as { id: string }[];
       for (const p of existingSqlitePujaris) {
         if (!validPujariIds.has(p.id)) {
@@ -597,7 +611,7 @@ export async function syncMongoItemsToDatabase(force = false) {
       }
     }
   } catch (err) {
-    // Ignore transient failures if FastAPI is momentarily booting
+    console.error('Error in syncMongoItemsToDatabase:', err);
   }
 }
 
@@ -1612,27 +1626,13 @@ apiRouter.post('/admin/pujas', requireAdmin, async (req: AuthenticatedRequest, r
   const duration_mins = data.duration_mins && data.duration_mins >= 15 ? data.duration_mins : 60;
   const priceRupees = Math.max(1, Math.round(data.price_paise / 100));
 
-  // 1. Save directly to MongoDB Atlas via FastAPI
-  let mongoId: string | null = null;
-  try {
-    const fastApiRes = await fetch('http://127.0.0.1:8001/pujas/', {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        title: data.name,
-        price: priceRupees,
-        des: description,
-        is_available: Boolean(data.is_active)
-      })
-    });
-    if (fastApiRes.ok) {
-      const resJson = await fastApiRes.json();
-      mongoId = resJson.id || resJson._id || (resJson.item && (resJson.item._id || resJson.item.id));
-    }
-  } catch (err) {
-    console.error('FastAPI error writing puja to MongoDB:', err);
-  }
+  // 1. Save directly to MongoDB Atlas (via FastAPI or direct Mongo Atlas on Vercel)
+  const mongoId = await createPujaInMongo({
+    title: data.name,
+    price: priceRupees,
+    des: description,
+    is_available: Boolean(data.is_active),
+  });
 
   const pujaId = mongoId ? `mongo_puja_${mongoId}` : 'puj_' + crypto.randomBytes(8).toString('hex');
   const baseSlug = (data.name || 'puja').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -1708,24 +1708,15 @@ apiRouter.put('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequest
 
   const d = parsed.data;
 
-  // 1. Update in MongoDB Atlas via FastAPI if it has a MongoDB ID
+  // 1. Update in MongoDB Atlas
   if (id.startsWith('mongo_puja_')) {
     const mongoId = id.replace('mongo_puja_', '');
-    try {
-      await fetch(`http://127.0.0.1:8001/pujas/${mongoId}`, {
-        method: 'PUT',
-        redirect: 'follow',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          title: d.name ?? puja.name,
-          price: Math.max(1, Math.round((d.price_paise ?? puja.price_paise) / 100)),
-          des: d.description ?? d.short_description ?? puja.description,
-          is_available: Boolean(d.is_active ?? puja.is_active)
-        })
-      });
-    } catch (err) {
-      console.error('FastAPI error updating puja in MongoDB:', err);
-    }
+    await updatePujaInMongo(mongoId, {
+      title: d.name ?? puja.name,
+      price: Math.max(1, Math.round((d.price_paise ?? puja.price_paise) / 100)),
+      des: d.description ?? d.short_description ?? puja.description,
+      is_available: Boolean(d.is_active ?? puja.is_active),
+    });
   }
 
   db.prepare(`
@@ -1782,17 +1773,10 @@ apiRouter.delete('/admin/pujas/:id', requireAdmin, async (req: AuthenticatedRequ
     return res.status(404).json({ error: 'Puja not found' });
   }
 
-  // 1. Delete from MongoDB Atlas via FastAPI
+  // 1. Delete from MongoDB Atlas
   if (id.startsWith('mongo_puja_')) {
     const mongoId = id.replace('mongo_puja_', '');
-    try {
-      await fetch(`http://127.0.0.1:8001/pujas/${mongoId}`, {
-        method: 'DELETE',
-        redirect: 'follow'
-      });
-    } catch (err) {
-      console.error('FastAPI error deleting puja in MongoDB:', err);
-    }
+    await deletePujaFromMongo(mongoId);
   }
 
   // If there was an uploaded image attached to this puja, remove it from disk
@@ -1874,28 +1858,14 @@ apiRouter.post('/admin/products', requireAdmin, async (req: AuthenticatedRequest
   const image = data.image?.trim() || 'thali';
   const priceRupees = Math.max(1, Math.round(data.price_paise / 100));
 
-  // 1. Save directly to MongoDB Atlas via FastAPI
-  let mongoId: string | null = null;
-  try {
-    const fastApiRes = await fetch('http://127.0.0.1:8001/inventory/', {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        title: data.name,
-        price: priceRupees,
-        des: description,
-        is_available: Boolean(data.is_active),
-        stock: data.stock || 20
-      })
-    });
-    if (fastApiRes.ok) {
-      const resJson = await fastApiRes.json();
-      mongoId = resJson.id || resJson._id || (resJson.item && (resJson.item._id || resJson.item.id));
-    }
-  } catch (err) {
-    console.error('FastAPI error writing product to MongoDB:', err);
-  }
+  // 1. Save directly to MongoDB Atlas (via FastAPI or direct Mongo Atlas on Vercel)
+  const mongoId = await createInventoryInMongo({
+    title: data.name,
+    price: priceRupees,
+    des: description,
+    is_available: Boolean(data.is_active),
+    stock: data.stock || 20,
+  });
 
   const prodId = mongoId ? `mongo_inv_${mongoId}` : 'prod_' + crypto.randomBytes(8).toString('hex');
   const baseSlug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -1963,25 +1933,16 @@ apiRouter.put('/admin/products/:id', requireAdmin, async (req: AuthenticatedRequ
 
   const d = parsed.data;
 
-  // 1. Update in MongoDB Atlas via FastAPI if it has a MongoDB ID
+  // 1. Update in MongoDB Atlas
   if (id.startsWith('mongo_inv_')) {
     const mongoId = id.replace('mongo_inv_', '');
-    try {
-      await fetch(`http://127.0.0.1:8001/inventory/${mongoId}`, {
-        method: 'PUT',
-        redirect: 'follow',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          title: d.name ?? product.name,
-          price: Math.max(1, Math.round((d.price_paise ?? product.price_paise) / 100)),
-          des: d.description ?? product.description,
-          is_available: Boolean(d.is_active ?? product.is_active),
-          stock: d.stock ?? product.stock ?? 20
-        })
-      });
-    } catch (err) {
-      console.error('FastAPI error updating product in MongoDB:', err);
-    }
+    await updateInventoryInMongo(mongoId, {
+      title: d.name ?? product.name,
+      price: Math.max(1, Math.round((d.price_paise ?? product.price_paise) / 100)),
+      des: d.description ?? product.description,
+      is_available: Boolean(d.is_active ?? product.is_active),
+      stock: d.stock ?? product.stock ?? 20,
+    });
   }
 
   db.prepare(`
@@ -2032,17 +1993,10 @@ apiRouter.delete('/admin/products/:id', requireAdmin, async (req: AuthenticatedR
     return res.status(404).json({ error: 'Product not found' });
   }
 
-  // 1. Delete from MongoDB Atlas via FastAPI
+  // 1. Delete from MongoDB Atlas
   if (id.startsWith('mongo_inv_')) {
     const mongoId = id.replace('mongo_inv_', '');
-    try {
-      await fetch(`http://127.0.0.1:8001/inventory/${mongoId}`, {
-        method: 'DELETE',
-        redirect: 'follow'
-      });
-    } catch (err) {
-      console.error('FastAPI error deleting product in MongoDB:', err);
-    }
+    await deleteInventoryFromMongo(mongoId);
   }
 
   // Remove attached image if uploaded
@@ -2248,26 +2202,12 @@ apiRouter.post('/admin/pujaris', requireAdmin, async (req: AuthenticatedRequest,
   const phone = d.phone?.trim() || null;
   const email = (d.email?.trim() && d.email.includes('@')) ? d.email.trim() : null;
 
-  // 1. Save directly to MongoDB Atlas via FastAPI
-  let mongoId: string | null = null;
-  try {
-    const fastApiRes = await fetch('http://127.0.0.1:8001/pujari/', {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        name: d.name,
-        des: bio,
-        is_available: Boolean(d.is_active)
-      })
-    });
-    if (fastApiRes.ok) {
-      const resJson = await fastApiRes.json();
-      mongoId = resJson.id || resJson._id || (resJson.item && (resJson.item._id || resJson.item.id));
-    }
-  } catch (err) {
-    console.error('FastAPI error writing pujari to MongoDB:', err);
-  }
+  // 1. Save directly to MongoDB Atlas (via FastAPI or direct Mongo Atlas on Vercel)
+  const mongoId = await createPujariInMongo({
+    name: d.name,
+    des: bio,
+    is_available: Boolean(d.is_active),
+  });
 
   const pujariId = mongoId ? `mongo_pujari_${mongoId}` : 'pjr_' + crypto.randomBytes(8).toString('hex');
   const baseSlug = d.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -2344,23 +2284,14 @@ apiRouter.put('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedReque
 
   const d = parsed.data;
 
-  // 1. Update in MongoDB Atlas via FastAPI if it has a MongoDB ID
+  // 1. Update in MongoDB Atlas
   if (id.startsWith('mongo_pujari_')) {
     const mongoId = id.replace('mongo_pujari_', '');
-    try {
-      await fetch(`http://127.0.0.1:8001/pujari/${mongoId}`, {
-        method: 'PUT',
-        redirect: 'follow',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          name: d.name ?? pujari.name,
-          des: d.bio ?? pujari.bio,
-          is_available: Boolean(d.is_active ?? pujari.is_active)
-        })
-      });
-    } catch (err) {
-      console.error('FastAPI error updating pujari in MongoDB:', err);
-    }
+    await updatePujariInMongo(mongoId, {
+      name: d.name ?? pujari.name,
+      des: d.bio ?? pujari.bio,
+      is_available: Boolean(d.is_active ?? pujari.is_active),
+    });
   }
 
   db.prepare(`
@@ -2419,17 +2350,10 @@ apiRouter.delete('/admin/pujaris/:id', requireAdmin, async (req: AuthenticatedRe
     return res.status(404).json({ error: 'Pujari not found' });
   }
 
-  // 1. Delete from MongoDB Atlas via FastAPI
+  // 1. Delete from MongoDB Atlas
   if (id.startsWith('mongo_pujari_')) {
     const mongoId = id.replace('mongo_pujari_', '');
-    try {
-      await fetch(`http://127.0.0.1:8001/pujari/${mongoId}`, {
-        method: 'DELETE',
-        redirect: 'follow'
-      });
-    } catch (err) {
-      console.error('FastAPI error deleting pujari in MongoDB:', err);
-    }
+    await deletePujariFromMongo(mongoId);
   }
 
   // Remove attached photo if uploaded
@@ -2488,7 +2412,10 @@ apiRouter.post('/admin/upload-image', requireAdmin, (req: AuthenticatedRequest, 
     if (match) {
       let ext = match[1].toLowerCase();
       if (ext === 'jpeg') ext = 'jpg';
-      if (ext.includes('svg')) ext = 'svg';
+      if (process.env.VERCEL) {
+        // On Vercel serverless filesystem is read-only, store dataUrl directly
+        return res.json({ success: true, url: dataUrl });
+      }
       const buffer = Buffer.from(match[2], 'base64');
       const safeName = `img_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
       const uploadsDir = path.resolve(process.cwd(), 'uploads');
